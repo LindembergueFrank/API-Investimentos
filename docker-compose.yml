@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: 'mysql:latest'
+    environment:
+      MYSQL_DATABASE: mydatabase
+      MYSQL_ROOT_PASSWORD: Senhatest12
+    ports:
+      - '3307:3306'
+    container_name: mysql_container
