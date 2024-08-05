@@ -5,6 +5,7 @@ Esta é uma API RESTful para investimento. Nesta primeira etapa, ela já fornece
 ## Tecnologias Utilizadas
 
 ![Java Logo](https://www.vectorlogo.zone/logos/java/java-icon.svg)
+![Spring Boot Logo](https://www.vectorlogo.zone/logos/springio/springio-icon.svg)
 ![Docker Logo](https://www.vectorlogo.zone/logos/docker/docker-icon.svg)
 ![MySQL Logo](https://www.vectorlogo.zone/logos/mysql/mysql-icon.svg)
 
@@ -80,7 +81,7 @@ Esta é uma API RESTful para investimento. Nesta primeira etapa, ela já fornece
   {
     "username": "string",
     "email": "string",
-    "password": "strin
+    "password": "string"
   }
 
 ### Excluir usuário 
