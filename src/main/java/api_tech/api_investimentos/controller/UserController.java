@@ -1,64 +1,56 @@
 package api_tech.api_investimentos.controller;
 
-import api_tech.api_investimentos.entity.User;
-import api_tech.api_investimentos.repository.UserRepository;
 import api_tech.api_investimentos.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
-@RequestMapping(("/v1/users"))
+@RequestMapping("/v1/users")
 public class UserController {
 
-    private final UserRepository userRepository;
-    private UserService userService;
+    private final UserService userService;
 
-    public UserController(UserService userService, UserRepository userRepository) {
+    public UserController(UserService userService) {
         this.userService = userService;
-        this.userRepository = userRepository;
     }
 
     @PostMapping
-    public ResponseEntity<User> createUser(@RequestBody CreateUserDto createUserDto) {
-        //Criando usuario
-        UUID userId = userService.createUser(createUserDto);
-        // Retornando o Id no cabecalho
+    public ResponseEntity<UserResponseDto> createUser(@RequestBody CreateUserDto createUserDto) {
+        var userId = userService.createUser(createUserDto);
         var createdUser = userService.getUserById(userId.toString()).orElseThrow();
         URI location = URI.create("/v1/users/" + userId);
-        return ResponseEntity.created(location).body(createdUser);
+
+        return ResponseEntity.created(location).body(UserResponseDto.from(createdUser));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable ("id") String id){
-        var user = userService.getUserById(id);
-
-        //Logica para verificar o que a API vai retornar
-        if (user.isPresent()){
-            return ResponseEntity.ok(user.get());
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<UserResponseDto> getUserById(@PathVariable("id") String id) {
+        return userService.getUserById(id)
+                .map(UserResponseDto::from)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @GetMapping()
-    public ResponseEntity<List<User>> listUsers(){
-        var users = userService.listUsers();
+    @GetMapping
+    public ResponseEntity<List<UserResponseDto>> listUsers() {
+        var users = userService.listUsers().stream()
+                .map(UserResponseDto::from)
+                .toList();
 
         return ResponseEntity.ok(users);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Void> updateUserById(@PathVariable ("id") String id, @RequestBody UpdateUserDto updateUserDto) {
+    public ResponseEntity<Void> updateUserById(@PathVariable("id") String id, @RequestBody UpdateUserDto updateUserDto) {
         userService.updateUserById(id, updateUserDto);
         return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping({"/{id}"})
-    public ResponseEntity<Void> deleteById(@PathVariable ("id") String id){
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteById(@PathVariable("id") String id) {
         userService.deleteById(id);
         return ResponseEntity.noContent().build();
     }
