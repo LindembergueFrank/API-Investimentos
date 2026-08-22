@@ -3,6 +3,7 @@ package api_tech.api_investimentos.controller;
 import api_tech.api_investimentos.entity.User;
 import api_tech.api_investimentos.repository.UserRepository;
 import api_tech.api_investimentos.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +24,7 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<User> createUser(@RequestBody CreateUserDto createUserDto) {
+    public ResponseEntity<User> createUser(@Valid @RequestBody CreateUserDto createUserDto) {
         //Criando usuario
         UUID userId = userService.createUser(createUserDto);
         // Retornando o Id no cabecalho
@@ -52,7 +53,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Void> updateUserById(@PathVariable ("id") String id, @RequestBody UpdateUserDto updateUserDto) {
+    public ResponseEntity<Void> updateUserById(@PathVariable ("id") String id, @Valid @RequestBody UpdateUserDto updateUserDto) {
         userService.updateUserById(id, updateUserDto);
         return ResponseEntity.noContent().build();
     }
