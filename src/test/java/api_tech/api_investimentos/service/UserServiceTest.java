@@ -113,7 +113,7 @@ class UserServiceTest {
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            var output = userService.getUserById(user.getId().toString());
+            var output = userService.getUserById(user.getId());
 
             assertTrue(output.isPresent());
             assertEquals(user.getId(), uuidArgumentCaptor.getValue());
@@ -127,7 +127,7 @@ class UserServiceTest {
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            var output = userService.getUserById(id.toString());
+            var output = userService.getUserById(id);
 
             assertTrue(output.isEmpty());
             assertEquals(id, uuidArgumentCaptor.getValue());
@@ -165,7 +165,7 @@ class UserServiceTest {
             when(passwordEncoder.encode(updateUserDto.password())).thenReturn("encoded-newpassword");
             doReturn(user).when(userRepository).save(userArgumentCaptor.capture());
 
-            userService.updateUserById(user.getId().toString(), updateUserDto);
+            userService.updateUserById(user.getId(), updateUserDto);
 
             assertEquals(user.getId(), uuidArgumentCaptor.getValue());
             var capturedUser = userArgumentCaptor.getValue();
@@ -186,7 +186,7 @@ class UserServiceTest {
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            userService.updateUserById(id.toString(), updateUserDto);
+            userService.updateUserById(id, updateUserDto);
 
             assertEquals(id, uuidArgumentCaptor.getValue());
             verify(userRepository, never()).save(any());
@@ -208,7 +208,7 @@ class UserServiceTest {
                     .deleteById(uuidArgumentCaptor.capture());
             var id = UUID.randomUUID();
 
-            userService.deleteById(id.toString());
+            userService.deleteById(id);
 
             var idList = uuidArgumentCaptor.getAllValues();
             assertEquals(id, idList.get(0));
@@ -225,7 +225,7 @@ class UserServiceTest {
                     .existsById(uuidArgumentCaptor.capture());
             var id = UUID.randomUUID();
 
-            userService.deleteById(id.toString());
+            userService.deleteById(id);
 
             assertEquals(id, uuidArgumentCaptor.getValue());
             verify(userRepository, never()).deleteById(any());
