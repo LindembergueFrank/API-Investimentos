@@ -13,21 +13,35 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
-    // Arrange
+
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UserService userService;
@@ -39,262 +53,193 @@ class UserServiceTest {
     private ArgumentCaptor<UUID> uuidArgumentCaptor;
 
     @Nested
-    class createUser {
+    class CreateUser {
 
-        // Cenario positivo
         @Test
-        @DisplayName("Deve criar usuario com sucesso")
-        void shouldCreateUser() {
-
-            // Arrange
-            var user = new User(
+        @DisplayName("Deve criar usuário armazenando a senha codificada")
+        void shouldCreateUserWithEncodedPassword() {
+            var persistedUser = new User(
                     UUID.randomUUID(),
                     "usernameteste",
                     "emailteste@replay.com",
-                    "password",
+                    "encoded-password",
                     Instant.now(),
                     null
             );
-            doReturn(user).when(userRepository).save(userArgumentCaptor.capture());
-            var input = new CreateUserDto("usernameteste",
+            var input = new CreateUserDto(
+                    "usernameteste",
                     "emailteste@replay.com",
-                    "Senhateste001");
-            // Act
+                    "Senhateste001"
+            );
+
+            when(passwordEncoder.encode(input.password())).thenReturn("encoded-password");
+            doReturn(persistedUser).when(userRepository).save(userArgumentCaptor.capture());
+
             var output = userService.createUser(input);
 
-            // Assert
             assertNotNull(output);
-            var userCaptorValue = userArgumentCaptor.getValue();
-
-            assertEquals(input.username(), userCaptorValue.getUsername());
-            assertEquals(input.email(), userCaptorValue.getEmail());
-            assertEquals(input.password(), userCaptorValue.getPassword());
+            var capturedUser = userArgumentCaptor.getValue();
+            assertEquals(input.username(), capturedUser.getUsername());
+            assertEquals(input.email(), capturedUser.getEmail());
+            assertEquals("encoded-password", capturedUser.getPassword());
+            assertNotEquals(input.password(), capturedUser.getPassword());
+            verify(passwordEncoder).encode(input.password());
         }
 
-        // Cenario negativo
         @Test
-        @DisplayName("Deve gerar exceção quando houver erro")
+        @DisplayName("Deve propagar exceção quando a persistência falhar")
         void shouldThrowExceptionWhenErrorOccurs() {
-            // Arrange
-            doThrow(new RuntimeException()).when(userRepository).save(any());
-            var input = new CreateUserDto("usernameteste",
+            var input = new CreateUserDto(
+                    "usernameteste",
                     "emailteste@replay.com",
-                    "Senhateste001");
+                    "Senhateste001"
+            );
 
-            // Act, Assert
+            when(passwordEncoder.encode(input.password())).thenReturn("encoded-password");
+            doThrow(new RuntimeException()).when(userRepository).save(any());
+
             assertThrows(RuntimeException.class, () -> userService.createUser(input));
         }
     }
 
     @Nested
-    class getUserById {
+    class GetUserById {
 
-        // Cenario positivo
         @Test
-        @DisplayName("Deve retornar usuário pelo id com sucesso quando houver optional")
+        @DisplayName("Deve retornar usuário quando o id existir")
         void shouldGetUserByIdWhenOptionalIsPresent() {
-
-            // Arrange
-            var user = new User(
-                    UUID.randomUUID(),
-                    "usernameteste",
-                    "emailteste@replay.com",
-                    "password",
-                    Instant.now(),
-                    null
-            );
+            var user = sampleUser();
             doReturn(Optional.of(user))
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            // Act
             var output = userService.getUserById(user.getId().toString());
 
-            // Assert
             assertTrue(output.isPresent());
             assertEquals(user.getId(), uuidArgumentCaptor.getValue());
         }
 
         @Test
-        @DisplayName("Deve retornar usuário pelo id com sucesso quando nao houver optional")
+        @DisplayName("Deve retornar vazio quando o id não existir")
         void shouldGetUserByIdWhenOptionalIsEmpty() {
-
-            // Arrange
             var id = UUID.randomUUID();
             doReturn(Optional.empty())
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            // Act
             var output = userService.getUserById(id.toString());
 
-            // Assert
             assertTrue(output.isEmpty());
             assertEquals(id, uuidArgumentCaptor.getValue());
         }
     }
 
     @Nested
-    class listUsers {
+    class ListUsers {
 
-        // Cenario positivo
         @Test
-        @DisplayName("Deve retornar lista de usuarios com sucesso")
-        void shouldReturnAllUsersWithSucess() {
+        @DisplayName("Deve retornar todos os usuários")
+        void shouldReturnAllUsers() {
+            var userList = List.of(sampleUser());
+            doReturn(userList).when(userRepository).findAll();
 
-            // Arrange
-            var user = new User(
-                    UUID.randomUUID(),
-                    "usernameteste",
-                    "emailteste@replay.com",
-                    "password",
-                    Instant.now(),
-                    null
-            );
-            var userList = List.of(user);
-            doReturn(userList)
-                    .when(userRepository)
-                    .findAll();
-
-            // Act
             var output = userService.listUsers();
 
-            // Assert
             assertNotNull(output);
             assertEquals(userList.size(), output.size());
         }
-
-
     }
-    
+
     @Nested
-    class updateUserById {
+    class UpdateUserById {
 
-        // Cenario positivo
         @Test
-        @DisplayName("Deve atualizar usuário pelo id quando existir e usuario e senha preeenchidas")
+        @DisplayName("Deve atualizar usuário e armazenar nova senha codificada")
         void shouldUpdateUserByIdWhenUserAndPasswordExist() {
-
-            // Arrange
-            var updateUserDto = new UpdateUserDto(
-                    "newusername",
-                    "newpassword"
-            );
-            var user = new User(
-                    UUID.randomUUID(),
-                    "usernameteste",
-                    "emailteste@replay.com",
-                    "password",
-                    Instant.now(),
-                    null
-            );
+            var updateUserDto = new UpdateUserDto("newusername", "newpassword");
+            var user = sampleUser();
 
             doReturn(Optional.of(user))
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
-            doReturn(user)
-                    .when(userRepository)
-                    .save(userArgumentCaptor.capture());
+            when(passwordEncoder.encode(updateUserDto.password())).thenReturn("encoded-newpassword");
+            doReturn(user).when(userRepository).save(userArgumentCaptor.capture());
 
-            // Act
             userService.updateUserById(user.getId().toString(), updateUserDto);
 
-            // Assert
             assertEquals(user.getId(), uuidArgumentCaptor.getValue());
-
-            var userCaptured = userArgumentCaptor.getValue();
-
-            assertEquals(updateUserDto.username(), userCaptured.getUsername());
-            assertEquals(updateUserDto.password(), userCaptured.getPassword());
-
-            verify(userRepository, times(1))
-                    .findById(uuidArgumentCaptor.getValue());
-            verify(userRepository, times(1))
-                    .save(user);
-
+            var capturedUser = userArgumentCaptor.getValue();
+            assertEquals(updateUserDto.username(), capturedUser.getUsername());
+            assertEquals("encoded-newpassword", capturedUser.getPassword());
+            assertNotEquals(updateUserDto.password(), capturedUser.getPassword());
+            verify(passwordEncoder).encode(updateUserDto.password());
+            verify(userRepository, times(1)).save(user);
         }
 
-        // Cenario positivo
         @Test
-        @DisplayName("Nao deve atualizar usuário pelo id quando nao existir e usuario e senha preeenchidas")
-        void shouldNotUpdateUserByIdWhenUserNotAndPasswordExist() {
-
-            // Arrange
-            var updateUserDto = new UpdateUserDto(
-                    "newusername",
-                    "newpassword"
-            );
+        @DisplayName("Não deve atualizar quando o usuário não existir")
+        void shouldNotUpdateUserByIdWhenUserDoesNotExist() {
+            var updateUserDto = new UpdateUserDto("newusername", "newpassword");
             var id = UUID.randomUUID();
 
             doReturn(Optional.empty())
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            // Act
             userService.updateUserById(id.toString(), updateUserDto);
 
-            // Assert
             assertEquals(id, uuidArgumentCaptor.getValue());
-
-            verify(userRepository, times(1))
-                    .findById(uuidArgumentCaptor.getValue());
-            verify(userRepository, times(0))
-                    .save(any());
+            verify(userRepository, never()).save(any());
+            verify(passwordEncoder, never()).encode(any());
         }
     }
 
     @Nested
-    class deleteById {
+    class DeleteById {
 
         @Test
-        @DisplayName("Deve deletar usuario por ID com sucesso quando usuario existir")
-        void shouldDeleteUserIdWithSucessWhenUserExist() {
-
-            // Arrange
+        @DisplayName("Deve deletar usuário quando ele existir")
+        void shouldDeleteUserWhenUserExists() {
             doReturn(true)
                     .when(userRepository)
                     .existsById(uuidArgumentCaptor.capture());
-
             doNothing()
                     .when(userRepository)
                     .deleteById(uuidArgumentCaptor.capture());
-
             var id = UUID.randomUUID();
 
-            // Act
             userService.deleteById(id.toString());
 
-            // Assert
             var idList = uuidArgumentCaptor.getAllValues();
             assertEquals(id, idList.get(0));
             assertEquals(id, idList.get(1));
-
             verify(userRepository, times(1)).existsById(idList.get(0));
             verify(userRepository, times(1)).deleteById(idList.get(1));
         }
 
-        // Cenario negativo
         @Test
-        @DisplayName("Nao deve deletar usuario por ID quando usuario  existir")
-        void shouldNotDeleteUserIdWithSucessWhenUserNotExist() {
-
-            // Arrange
+        @DisplayName("Não deve deletar usuário inexistente")
+        void shouldNotDeleteUserWhenUserDoesNotExist() {
             doReturn(false)
                     .when(userRepository)
                     .existsById(uuidArgumentCaptor.capture());
-
             var id = UUID.randomUUID();
 
-            // Act
             userService.deleteById(id.toString());
 
-            // Assert
             assertEquals(id, uuidArgumentCaptor.getValue());
-
-            verify(userRepository, times(1))
-                    .existsById(uuidArgumentCaptor.getValue());
-            verify(userRepository, times(0))
-                    .deleteById(any());
+            verify(userRepository, never()).deleteById(any());
         }
+    }
+
+    private User sampleUser() {
+        return new User(
+                UUID.randomUUID(),
+                "usernameteste",
+                "emailteste@replay.com",
+                "encoded-password",
+                Instant.now(),
+                null
+        );
     }
 }

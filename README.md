@@ -1,137 +1,131 @@
 # API de Investimentos
 
-Esta é uma API RESTful para investimento. Nesta primeira etapa, ela já fornece funcionalidades para criar, ler, atualizar e excluir (CRUD) usuários.
+API REST em evolução para servir como base de um agregador de investimentos, desenvolvida com **Java 21, Spring Boot, JPA/Hibernate e MySQL**.
 
-## Tecnologias Utilizadas
+O projeto começou pelo domínio de usuários e está sendo gradualmente elevado de exercício de backend para um repositório de portfólio com foco em segurança, testes, configuração por ambiente e práticas de engenharia de software.
 
-![Java Logo](https://www.vectorlogo.zone/logos/java/java-icon.svg)
-![Spring Boot Logo](https://www.vectorlogo.zone/logos/springio/springio-icon.svg)
-![Docker Logo](https://www.vectorlogo.zone/logos/docker/docker-icon.svg)
-![MySQL Logo](https://www.vectorlogo.zone/logos/mysql/mysql-icon.svg)
+## Estado atual
 
-## Conecte-se no LinkedIn
+A API implementa CRUD básico de usuários em `/v1/users`.
 
-[![LinkedIn Logo](https://www.vectorlogo.zone/logos/linkedin/linkedin-icon.svg)](https://www.linkedin.com/in/lindembergue-frank-b991202b7/)
+| Método | Endpoint | Descrição |
+| --- | --- | --- |
+| `POST` | `/v1/users` | cria um usuário |
+| `GET` | `/v1/users/{id}` | consulta um usuário |
+| `GET` | `/v1/users` | lista usuários |
+| `PUT` | `/v1/users/{id}` | atualiza nome e/ou senha |
+| `DELETE` | `/v1/users/{id}` | remove um usuário |
 
-## Funcionalidades
+## Segurança aplicada
 
-- **Criar Usuário**: Cria um novo usuário e retorna o usuário criado com o ID no cabeçalho.
-- **Buscar Usuário por ID**: Recupera um usuário existente pelo ID.
-- **Listar Todos os Usuários**: Obtém a lista de todos os usuários cadastrados.
-- **Atualizar Usuário**: Atualiza os dados de um usuário existente pelo ID.
-- **Excluir Usuário**: Remove um usuário existente pelo ID.
+- senhas são armazenadas com **BCrypt**;
+- respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
+- credenciais de banco não ficam versionadas;
+- configuração local utiliza variáveis de ambiente;
+- `.env` é ignorado pelo Git e `.env.example` contém apenas valores de referência;
+- testes usam banco H2 em memória e não dependem de credenciais externas.
 
-## Endpoints
+> O projeto ainda não implementa autenticação/autorização. BCrypt protege o armazenamento das credenciais, mas autenticação com Spring Security permanece no roadmap.
 
-### Criar usuário
+## Exemplo de criação
 
-- **URL**: `/v1/users`
-- **Método**: `POST`
-- **Corpo da Requisição**:
-  ```json
-  {
-    "username": "string",
-    "email": "string",
-    "password": "string"
-  }
-  
-- **Resposta**:
-  - Código: `201 Created`
-  ```json
-  {
-    "id": "UUID",
-    "username": "string",
-    "email": "string",
-    "password": "string",
-    "creationTimestamp": "ISO8601",
-    "updateTimestamp": "ISO8601"
-  }
-  
-### Buscar usuário por ID
-- **URL**: `/v1/users/{id}`
-- **Método**: `GET`
-- **Parâmetros**:
-  - `id` (Path) - `ID do usuário`
-- **Resposta**:
-  - Código: `200 OK`
+```http
+POST /v1/users
+Content-Type: application/json
+```
 
-### Listar todos os usuários
-- **URL**:
-- **Método**: `GET`
-- **Resposta**:
-  - Código: '200 OK'
-  ```Json
-  {
-    "id": "UUID",
-    "username": "string",
-    "email": "string",
-    "password": "string",
-    "creationTimestamp": "ISO8601",
-    "updateTimestamp": "ISO8601"
-  }
-### Atualizar usuário
+```json
+{
+  "username": "lindembergue",
+  "email": "dev@example.com",
+  "password": "uma-senha-forte"
+}
+```
 
-- **URL**: `/v1/users/{id}`
-- **Método**: `PUT`
-- **Parâmetros**:
-  - `id` (Path) - `ID do usuário`
-- **Resposta**: 
-  - Código: `200 OK`
-  ```Json
-  {
-    "username": "string",
-    "email": "string",
-    "password": "string"
-  }
+Resposta `201 Created`:
 
-### Excluir usuário 
+```json
+{
+  "id": "9cc32af0-6bd3-47aa-9f03-2bf93825b5be",
+  "username": "lindembergue",
+  "email": "dev@example.com",
+  "creationTimestamp": "2026-08-29T16:00:00Z",
+  "updateTimestamp": "2026-08-29T16:00:00Z"
+}
+```
 
-- **URL**: `/v1/users/{id}`
-- **Método**: `DELETE`
-- **Parâmetros**:
-  - `id` (Path) - ID do usuário
-- **Resposta**:
-  - Código: `204 No Content`
+A senha não faz parte do contrato de resposta.
 
-  ```Json
-  {
-    "username": "string",
-    "password": "string",
-  }
+## Executando localmente
 
-## Como Contribuir
+### Pré-requisitos
 
-### Dê um Fork
-1. Clique no botão `Fork` no canto superior direito da página para criar uma cópia deste repositório no seu GitHub.
+- Java 21;
+- Docker + Docker Compose.
 
-### Dê um Star
-1. Se você achou este repositório útil, dê um `Star` clicando na estrela no canto superior direito da página.
+Crie seu arquivo local de ambiente a partir do exemplo:
 
-### Clone o Repositório
-1. Após dar o Fork, clone o repositório para a sua máquina local:
-    ```sh
-    git clone https://github.com/LindembergueFrank/API-Investimentos
-    ```
+```bash
+cp .env.example .env
+```
 
-### Faça as Suas Alterações
-1. Crie uma nova branch para as suas alterações:
-    ```sh
-    git checkout -b minha-nova-feature
-    ```
+Defina uma senha de desenvolvimento em `DB_PASSWORD` e suba o MySQL:
 
-2. Faça as alterações necessárias e comite as mudanças:
-    ```sh
-    git commit -m "Minha nova feature"
-    ```
+```bash
+docker compose up -d
+```
 
-3. Empurre as alterações para o seu repositório forkado:
-    ```sh
-    git push origin minha-nova-feature
-    ```
+Exporte as variáveis do `.env` para o processo da aplicação conforme o seu shell/IDE e execute:
 
-### Abra um Pull Request
-1. Vá até a página do seu repositório forkado no GitHub e clique no botão `New Pull Request` para enviar suas alterações para revisão.
+```bash
+./mvnw spring-boot:run
+```
 
-## Contribuições
+Por padrão, a aplicação espera MySQL em `localhost:3307` e banco `mydatabase`.
 
-Este repositório é público e qualquer um pode utilizá-lo. Se você tiver alguma dúvida ou sugestão, por favor, abra uma _issue_.
+## Testes
+
+A suíte unitária e o teste de contexto usam H2 em memória:
+
+```bash
+./mvnw test
+```
+
+O mesmo comando é executado automaticamente pelo GitHub Actions em pushes e pull requests para `master`.
+
+## Organização
+
+```text
+src/main/java/api_tech/api_investimentos/
+├── config/       # configuração técnica, como PasswordEncoder
+├── controller/   # endpoints e DTOs HTTP
+├── entity/       # entidades JPA
+├── repository/   # persistência
+└── service/      # regras de aplicação
+```
+
+## Roadmap de engenharia
+
+Próximas evoluções priorizadas:
+
+1. validação de entrada com Bean Validation;
+2. tratamento global e padronizado de erros;
+3. testes de controller/contrato HTTP;
+4. OpenAPI/Swagger;
+5. autenticação e autorização com Spring Security;
+6. migrations com Flyway;
+7. modelagem do domínio de investimentos;
+8. observabilidade e configuração de produção.
+
+## Princípios de contribuição
+
+- commits seguem **Conventional Commits**;
+- mudanças devem ser pequenas, coerentes e testáveis;
+- segurança, testes e documentação têm prioridade sobre quantidade de commits;
+- secrets e arquivos locais nunca devem ser versionados.
+
+## Autor
+
+**Lindembergue Frank**
+
+[LinkedIn](https://www.linkedin.com/in/lindembergue-frank-b991202b7/)
