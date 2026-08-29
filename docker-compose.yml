@@ -1,11 +1,19 @@
-version: '3.8'
-
 services:
   mysql:
-    image: 'mysql:latest'
+    image: mysql:8.4
+    container_name: api_investimentos_mysql
     environment:
-      MYSQL_DATABASE: mydatabase
-      MYSQL_ROOT_PASSWORD: Senhatest12
+      MYSQL_DATABASE: ${DB_NAME:-mydatabase}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no ambiente ou em um arquivo .env local}
     ports:
-      - '3307:3306'
-    container_name: mysql_container
+      - "${DB_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:
