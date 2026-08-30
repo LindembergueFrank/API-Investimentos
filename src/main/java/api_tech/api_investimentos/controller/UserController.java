@@ -29,7 +29,7 @@ public class UserController {
     @PostMapping
     public ResponseEntity<UserResponseDto> createUser(@Valid @RequestBody CreateUserDto createUserDto) {
         UUID userId = userService.createUser(createUserDto);
-        var createdUser = userService.getUserById(userId).orElseThrow();
+        var createdUser = userService.getUserById(userId);
         URI location = URI.create("/v1/users/" + userId);
 
         return ResponseEntity.created(location).body(UserResponseDto.from(createdUser));
@@ -38,12 +38,7 @@ public class UserController {
     @GetMapping("/{id}")
     public ResponseEntity<UserResponseDto> getUserById(@PathVariable("id") UUID id) {
         var user = userService.getUserById(id);
-
-        if (user.isPresent()) {
-            return ResponseEntity.ok(UserResponseDto.from(user.get()));
-        }
-
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(UserResponseDto.from(user));
     }
 
     @GetMapping

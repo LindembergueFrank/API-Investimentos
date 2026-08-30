@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -37,8 +36,9 @@ public class UserService {
         return userSaved.getId();
     }
 
-    public Optional<User> getUserById(UUID id) {
-        return userRepository.findById(id);
+    public User getUserById(UUID id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
     }
 
     public List<User> listUsers() {
@@ -46,13 +46,7 @@ public class UserService {
     }
 
     public void updateUserById(UUID id, UpdateUserDto updateUserDto) {
-        var userExists = userRepository.findById(id);
-
-        if (userExists.isEmpty()) {
-            return;
-        }
-
-        var user = userExists.get();
+        var user = getUserById(id);
 
         if (updateUserDto.username() != null && !updateUserDto.username().isBlank()) {
             user.setUsername(updateUserDto.username());
@@ -66,8 +60,10 @@ public class UserService {
     }
 
     public void deleteById(UUID id) {
-        if (userRepository.existsById(id)) {
-            userRepository.deleteById(id);
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException(id);
         }
+
+        userRepository.deleteById(id);
     }
 }
