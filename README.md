@@ -31,6 +31,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - autenticação usa access tokens JWT assinados com HS256 e expiração curta;
 - refresh tokens são opacos, rotativos e persistidos somente como hash SHA-256;
 - a reutilização de um refresh token revogado invalida toda a família da sessão;
+- os endpoints de autenticação possuem limite configurável por endereço de origem;
 - a API é stateless e exige token nos endpoints protegidos;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
@@ -109,6 +110,8 @@ Cada renovação revoga o token anterior e devolve um novo. Se um token anterior
 
 Para encerrar a sessão, use `POST /v1/auth/revoke` com o mesmo corpo. A resposta é sempre `204 No Content`, inclusive para valores desconhecidos, evitando revelar quais tokens são válidos. Respostas que contêm credenciais usam `Cache-Control: no-store`.
 
+Os três endpoints de autenticação compartilham, por endereço de origem, um limite padrão de 20 requisições por minuto. Ao excedê-lo, a API responde `429` em Problem Details, informa `Retry-After` e não processa a credencial. Ajuste `AUTH_RATE_LIMIT_MAX_REQUESTS` e `AUTH_RATE_LIMIT_WINDOW` conforme o ambiente. O limitador é local à instância; múltiplas réplicas exigirão armazenamento compartilhado em uma evolução posterior. A aplicação usa apenas o endereço remoto fornecido pelo servidor e não confia diretamente em headers encaminhados pelo cliente.
+
 ## Executando localmente
 
 ### Pré-requisitos
@@ -178,11 +181,11 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. rate limiting e proteção contra abuso nos endpoints de autenticação;
-2. verificação de e-mail e recuperação de senha;
-3. perfis e autorização por recurso;
-4. modelagem do domínio de investimentos;
-5. observabilidade e configuração de produção.
+1. limpeza segura e observável de sessões expiradas;
+2. perfis e autorização por recurso;
+3. modelagem do domínio de investimentos;
+4. verificação de e-mail e recuperação de senha;
+5. observabilidade, rate limiting distribuído e configuração de produção.
 
 ## Princípios de contribuição
 

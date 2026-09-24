@@ -43,6 +43,9 @@ public class AuthenticationController {
                             schema = @Schema(implementation = ProblemDetailResponse.class))),
             @ApiResponse(responseCode = "401", description = "Credenciais inválidas",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class))),
+            @ApiResponse(responseCode = "429", description = "Limite de requisições excedido",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
     })
     public ResponseEntity<AccessTokenResponse> authenticate(@Valid @RequestBody LoginRequest request) {
@@ -65,6 +68,9 @@ public class AuthenticationController {
                             schema = @Schema(implementation = ProblemDetailResponse.class))),
             @ApiResponse(responseCode = "401", description = "Refresh token inválido, expirado ou revogado",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class))),
+            @ApiResponse(responseCode = "429", description = "Limite de requisições excedido",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
     })
     public ResponseEntity<AccessTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
@@ -81,6 +87,9 @@ public class AuthenticationController {
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Revogação processada"),
             @ApiResponse(responseCode = "400", description = "Requisição inválida",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class))),
+            @ApiResponse(responseCode = "429", description = "Limite de requisições excedido",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
     })
