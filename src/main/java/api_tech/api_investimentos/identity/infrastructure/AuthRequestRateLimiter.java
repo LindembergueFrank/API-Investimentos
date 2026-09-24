@@ -1,6 +1,7 @@
 package api_tech.api_investimentos.identity.infrastructure;
 
 import api_tech.api_investimentos.config.AuthRateLimitProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -20,6 +21,7 @@ public class AuthRequestRateLimiter {
     private final ConcurrentHashMap<String, RequestWindow> windows = new ConcurrentHashMap<>();
     private final AtomicLong nextCleanupEpochSecond = new AtomicLong();
 
+    @Autowired
     public AuthRequestRateLimiter(AuthRateLimitProperties properties) {
         this(properties, Clock.systemUTC());
     }
