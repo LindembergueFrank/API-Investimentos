@@ -2,8 +2,6 @@ package api_tech.api_investimentos.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import jakarta.crypto.SecretKey;
-import jakarta.crypto.spec.SecretKeySpec;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +24,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Base64;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
