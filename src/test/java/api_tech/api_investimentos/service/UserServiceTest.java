@@ -113,7 +113,7 @@ class UserServiceTest {
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            var output = userService.getUserById(user.getId().toString());
+            var output = userService.getUserById(user.getId());
 
             assertTrue(output.isPresent());
             assertEquals(user.getId(), uuidArgumentCaptor.getValue());
@@ -127,7 +127,7 @@ class UserServiceTest {
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            var output = userService.getUserById(id.toString());
+            var output = userService.getUserById(id);
 
             assertTrue(output.isEmpty());
             assertEquals(id, uuidArgumentCaptor.getValue());
@@ -165,7 +165,7 @@ class UserServiceTest {
             when(passwordEncoder.encode(updateUserDto.password())).thenReturn("encoded-newpassword");
             doReturn(user).when(userRepository).save(userArgumentCaptor.capture());
 
-            userService.updateUserById(user.getId().toString(), updateUserDto);
+            userService.updateUserById(user.getId(), updateUserDto);
 
             assertEquals(user.getId(), uuidArgumentCaptor.getValue());
             var capturedUser = userArgumentCaptor.getValue();
@@ -177,8 +177,8 @@ class UserServiceTest {
         }
 
         @Test
-        @DisplayName("Não deve atualizar quando o usuário não existir")
-        void shouldNotUpdateUserByIdWhenUserDoesNotExist() {
+        @DisplayName("Deve informar quando o usuário a atualizar não existir")
+        void shouldThrowWhenUpdatingMissingUser() {
             var updateUserDto = new UpdateUserDto("newusername", "newpassword");
             var id = UUID.randomUUID();
 
@@ -186,9 +186,13 @@ class UserServiceTest {
                     .when(userRepository)
                     .findById(uuidArgumentCaptor.capture());
 
-            userService.updateUserById(id.toString(), updateUserDto);
+            var exception = assertThrows(
+                    UserNotFoundException.class,
+                    () -> userService.updateUserById(id, updateUserDto)
+            );
 
             assertEquals(id, uuidArgumentCaptor.getValue());
+            assertEquals(id, exception.userId());
             verify(userRepository, never()).save(any());
             verify(passwordEncoder, never()).encode(any());
         }
@@ -208,7 +212,7 @@ class UserServiceTest {
                     .deleteById(uuidArgumentCaptor.capture());
             var id = UUID.randomUUID();
 
-            userService.deleteById(id.toString());
+            userService.deleteById(id);
 
             var idList = uuidArgumentCaptor.getAllValues();
             assertEquals(id, idList.get(0));
@@ -218,16 +222,20 @@ class UserServiceTest {
         }
 
         @Test
-        @DisplayName("Não deve deletar usuário inexistente")
-        void shouldNotDeleteUserWhenUserDoesNotExist() {
+        @DisplayName("Deve informar quando o usuário a excluir não existir")
+        void shouldThrowWhenDeletingMissingUser() {
             doReturn(false)
                     .when(userRepository)
                     .existsById(uuidArgumentCaptor.capture());
             var id = UUID.randomUUID();
 
-            userService.deleteById(id.toString());
+            var exception = assertThrows(
+                    UserNotFoundException.class,
+                    () -> userService.deleteById(id)
+            );
 
             assertEquals(id, uuidArgumentCaptor.getValue());
+            assertEquals(id, exception.userId());
             verify(userRepository, never()).deleteById(any());
         }
     }
