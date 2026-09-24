@@ -13,8 +13,17 @@ A API implementa CRUD básico de usuários em `/v1/users`.
 | `POST` | `/v1/users` | cria um usuário |
 | `GET` | `/v1/users/{id}` | consulta um usuário |
 | `GET` | `/v1/users` | lista usuários |
-| `PUT` | `/v1/users/{id}` | atualiza nome e/ou senha |
+| `PATCH` | `/v1/users/{id}` | atualiza nome e/ou senha |
 | `DELETE` | `/v1/users/{id}` | remove um usuário |
+
+## Documentação da API
+
+Com a aplicação em execução, o contrato OpenAPI e a interface Swagger UI ficam disponíveis em:
+
+- `http://localhost:8080/v3/api-docs` — especificação OpenAPI em JSON;
+- `http://localhost:8080/swagger-ui.html` — documentação interativa.
+
+Os endpoints documentam payloads, validações, códigos de resposta e erros no formato Problem Details (RFC 9457). Exemplos usam somente dados fictícios.
 
 ## Segurança aplicada
 
@@ -83,9 +92,22 @@ Exporte as variáveis do `.env` para o processo da aplicação conforme o seu sh
 
 Por padrão, a aplicação espera MySQL em `localhost:3307` e banco `mydatabase`.
 
+## Migrações de banco
+
+O Flyway é responsável pela evolução do schema. Na inicialização, migrations pendentes em `src/main/resources/db/migration` são aplicadas antes de o Hibernate validar o mapeamento JPA. O Hibernate usa `ddl-auto=validate` e não cria nem altera tabelas.
+
+Para um banco local descartável criado antes da adoção do Flyway, recrie o volume:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+Esse comando remove os dados locais. Para preservar um banco existente, faça backup, confira se o schema corresponde à migration `V1` e execute a aplicação uma única vez com `FLYWAY_BASELINE_ON_MIGRATE=true`. Depois remova essa variável para que divergências futuras voltem a interromper a inicialização.
+
 ## Testes
 
-A suíte unitária e o teste de contexto usam H2 em memória:
+A suíte unitária e os testes de integração usam H2 em memória. O teste de contexto executa a migration inicial e valida o schema com Hibernate:
 
 ```bash
 ./mvnw test
@@ -108,14 +130,11 @@ src/main/java/api_tech/api_investimentos/
 
 Próximas evoluções priorizadas:
 
-1. validação de entrada com Bean Validation;
-2. tratamento global e padronizado de erros;
-3. testes de controller/contrato HTTP;
-4. OpenAPI/Swagger;
-5. autenticação e autorização com Spring Security;
-6. migrations com Flyway;
-7. modelagem do domínio de investimentos;
-8. observabilidade e configuração de produção.
+1. migrations com Flyway;
+2. organização por funcionalidade;
+3. autenticação e autorização com Spring Security;
+4. modelagem do domínio de investimentos;
+5. observabilidade e configuração de produção.
 
 ## Princípios de contribuição
 
