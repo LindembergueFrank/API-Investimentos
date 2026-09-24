@@ -13,19 +13,29 @@ A API implementa CRUD básico de usuários em `/v1/users`.
 | `POST` | `/v1/users` | cria um usuário |
 | `GET` | `/v1/users/{id}` | consulta um usuário |
 | `GET` | `/v1/users` | lista usuários |
-| `PUT` | `/v1/users/{id}` | atualiza nome e/ou senha |
+| `PATCH` | `/v1/users/{id}` | atualiza nome e/ou senha |
 | `DELETE` | `/v1/users/{id}` | remove um usuário |
+
+## Documentação da API
+
+Com a aplicação em execução, o contrato OpenAPI e a interface Swagger UI ficam disponíveis em:
+
+- `http://localhost:8080/v3/api-docs` — especificação OpenAPI em JSON;
+- `http://localhost:8080/swagger-ui.html` — documentação interativa.
+
+Os endpoints documentam payloads, validações, códigos de resposta e erros no formato Problem Details (RFC 9457). Exemplos usam somente dados fictícios.
 
 ## Segurança aplicada
 
 - senhas são armazenadas com **BCrypt**;
+- autenticação usa access tokens JWT assinados com HS256 e expiração curta;
+- a API é stateless e exige token nos endpoints protegidos;
+- a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
 - configuração local utiliza variáveis de ambiente;
 - `.env` é ignorado pelo Git e `.env.example` contém apenas valores de referência;
 - testes usam banco H2 em memória e não dependem de credenciais externas.
-
-> O projeto ainda não implementa autenticação/autorização. BCrypt protege o armazenamento das credenciais, mas autenticação com Spring Security permanece no roadmap.
 
 ## Exemplo de criação
 
@@ -56,6 +66,32 @@ Resposta `201 Created`:
 
 A senha não faz parte do contrato de resposta.
 
+## Autenticação
+
+O cadastro e a emissão de token são públicos. Os demais endpoints exigem um access token JWT no header `Authorization: Bearer <token>`. O token expira em 15 minutos por padrão e a API não cria sessão no servidor.
+
+Gere uma chave exclusiva para o ambiente antes de iniciar a aplicação:
+
+```bash
+openssl rand -base64 32
+```
+
+Defina o resultado em `AUTH_JWT_SECRET_BASE64`. A aplicação interrompe a inicialização quando a chave está ausente, não é Base64 válida ou possui menos de 256 bits.
+
+Para autenticar:
+
+```http
+POST /v1/auth/token
+Content-Type: application/json
+
+{
+  "email": "investidor@example.com",
+  "password": "uma-senha-forte"
+}
+```
+
+Credenciais inválidas retornam a mesma resposta genérica, sem indicar se o e-mail está cadastrado.
+
 ## Executando localmente
 
 ### Pré-requisitos
@@ -83,9 +119,22 @@ Exporte as variáveis do `.env` para o processo da aplicação conforme o seu sh
 
 Por padrão, a aplicação espera MySQL em `localhost:3307` e banco `mydatabase`.
 
+## Migrações de banco
+
+O Flyway é responsável pela evolução do schema. Na inicialização, migrations pendentes em `src/main/resources/db/migration` são aplicadas antes de o Hibernate validar o mapeamento JPA. O Hibernate usa `ddl-auto=validate` e não cria nem altera tabelas.
+
+Para um banco local descartável criado antes da adoção do Flyway, recrie o volume:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+Esse comando remove os dados locais. Para preservar um banco existente, faça backup, confira se o schema corresponde às migrations publicadas e execute a aplicação uma única vez com `FLYWAY_BASELINE_ON_MIGRATE=true`. Depois remova essa variável para que divergências futuras voltem a interromper a inicialização.
+
 ## Testes
 
-A suíte unitária e o teste de contexto usam H2 em memória:
+A suíte unitária e os testes de integração usam H2 em memória. O teste de contexto executa as migrations versionadas e valida o schema com Hibernate:
 
 ```bash
 ./mvnw test
@@ -97,25 +146,26 @@ O mesmo comando é executado automaticamente pelo GitHub Actions em pushes e pul
 
 ```text
 src/main/java/api_tech/api_investimentos/
-├── config/       # configuração técnica, como PasswordEncoder
-├── controller/   # endpoints e DTOs HTTP
-├── entity/       # entidades JPA
-├── repository/   # persistência
-└── service/      # regras de aplicação
+├── common/api/               # contrato comum de erros HTTP
+├── config/                   # configurações técnicas compartilhadas
+└── identity/
+    ├── api/                  # controllers e DTOs HTTP
+    ├── application/          # casos de uso, comandos e portas
+    ├── domain/               # modelo de identidade
+    └── infrastructure/       # adaptadores de persistência
 ```
+
+Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infraestrutura no mesmo módulo. DTOs HTTP são convertidos em comandos antes de entrar na aplicação, e o serviço depende da porta `UserRepository`, não do Spring Data diretamente.
 
 ## Roadmap de engenharia
 
 Próximas evoluções priorizadas:
 
-1. validação de entrada com Bean Validation;
-2. tratamento global e padronizado de erros;
-3. testes de controller/contrato HTTP;
-4. OpenAPI/Swagger;
-5. autenticação e autorização com Spring Security;
-6. migrations com Flyway;
-7. modelagem do domínio de investimentos;
-8. observabilidade e configuração de produção.
+1. refresh tokens rotativos e encerramento de sessão;
+2. verificação de e-mail e recuperação de senha;
+3. perfis e autorização por recurso;
+4. modelagem do domínio de investimentos;
+5. observabilidade e configuração de produção.
 
 ## Princípios de contribuição
 
