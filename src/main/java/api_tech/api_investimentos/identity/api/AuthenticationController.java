@@ -46,10 +46,49 @@ public class AuthenticationController {
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
     })
     public ResponseEntity<AccessTokenResponse> authenticate(@Valid @RequestBody LoginRequest request) {
-        var token = authenticationService.authenticate(new AuthenticateUserCommand(request.email(), request.password()));
+        var session = authenticationService.authenticate(new AuthenticateUserCommand(request.email(), request.password()));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.PRAGMA, "no-cache")
-                .body(AccessTokenResponse.from(token));
+                .body(AccessTokenResponse.from(session));
+    }
+
+    @PostMapping("/refresh")
+    @SecurityRequirements
+    @Operation(summary = "Renova uma sessão e rotaciona o refresh token")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Sessão renovada",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = AccessTokenResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Refresh token inválido, expirado ou revogado",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class)))
+    })
+    public ResponseEntity<AccessTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        var session = authenticationService.refresh(request.refreshToken());
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .body(AccessTokenResponse.from(session));
+    }
+
+    @PostMapping("/revoke")
+    @SecurityRequirements
+    @Operation(summary = "Revoga uma família de refresh tokens")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Revogação processada"),
+            @ApiResponse(responseCode = "400", description = "Requisição inválida",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class)))
+    })
+    public ResponseEntity<Void> revoke(@Valid @RequestBody RefreshTokenRequest request) {
+        authenticationService.revoke(request.refreshToken());
+        return ResponseEntity.noContent()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .build();
     }
 }

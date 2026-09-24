@@ -29,6 +29,8 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 
 - senhas são armazenadas com **BCrypt**;
 - autenticação usa access tokens JWT assinados com HS256 e expiração curta;
+- refresh tokens são opacos, rotativos e persistidos somente como hash SHA-256;
+- a reutilização de um refresh token revogado invalida toda a família da sessão;
 - a API é stateless e exige token nos endpoints protegidos;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
@@ -68,7 +70,7 @@ A senha não faz parte do contrato de resposta.
 
 ## Autenticação
 
-O cadastro e a emissão de token são públicos. Os demais endpoints exigem um access token JWT no header `Authorization: Bearer <token>`. O token expira em 15 minutos por padrão e a API não cria sessão no servidor.
+O cadastro e os endpoints de autenticação são públicos. Os demais endpoints exigem um access token JWT no header `Authorization: Bearer <token>`. O access token expira em 15 minutos por padrão; o refresh token expira em 30 dias e é substituído a cada renovação.
 
 Gere uma chave exclusiva para o ambiente antes de iniciar a aplicação:
 
@@ -91,6 +93,21 @@ Content-Type: application/json
 ```
 
 Credenciais inválidas retornam a mesma resposta genérica, sem indicar se o e-mail está cadastrado.
+
+A autenticação retorna `accessToken`, `expiresIn`, `refreshToken` e `refreshExpiresIn`. Para renovar a sessão, envie o refresh token uma única vez:
+
+```http
+POST /v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "token-opaco"
+}
+```
+
+Cada renovação revoga o token anterior e devolve um novo. Se um token anterior for reutilizado, toda a família da sessão é revogada como medida contra roubo de credenciais. O cliente deve então solicitar novo login.
+
+Para encerrar a sessão, use `POST /v1/auth/revoke` com o mesmo corpo. A resposta é sempre `204 No Content`, inclusive para valores desconhecidos, evitando revelar quais tokens são válidos. Respostas que contêm credenciais usam `Cache-Control: no-store`.
 
 ## Executando localmente
 
@@ -161,7 +178,7 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. refresh tokens rotativos e encerramento de sessão;
+1. rate limiting e proteção contra abuso nos endpoints de autenticação;
 2. verificação de e-mail e recuperação de senha;
 3. perfis e autorização por recurso;
 4. modelagem do domínio de investimentos;

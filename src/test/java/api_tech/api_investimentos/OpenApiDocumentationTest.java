@@ -26,6 +26,9 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.info.title").value("API de Investimentos"))
                 .andExpect(jsonPath("$.paths['/v1/users'].post.responses['201']").exists())
                 .andExpect(jsonPath("$.paths['/v1/users/{id}'].patch.responses['204']").exists())
+                .andExpect(jsonPath("$.paths['/v1/auth/token'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/v1/auth/refresh'].post.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/v1/auth/revoke'].post.responses['204']").exists())
                 .andExpect(jsonPath("$.components.schemas.CreateUserDto.properties.password.writeOnly").value(true))
                 .andExpect(jsonPath("$.components.schemas.UserResponseDto.properties.password").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.ProblemDetail").exists());
