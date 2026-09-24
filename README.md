@@ -92,9 +92,22 @@ Exporte as variáveis do `.env` para o processo da aplicação conforme o seu sh
 
 Por padrão, a aplicação espera MySQL em `localhost:3307` e banco `mydatabase`.
 
+## Migrações de banco
+
+O Flyway é responsável pela evolução do schema. Na inicialização, migrations pendentes em `src/main/resources/db/migration` são aplicadas antes de o Hibernate validar o mapeamento JPA. O Hibernate usa `ddl-auto=validate` e não cria nem altera tabelas.
+
+Para um banco local descartável criado antes da adoção do Flyway, recrie o volume:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+Esse comando remove os dados locais. Para preservar um banco existente, faça backup, confira se o schema corresponde à migration `V1` e execute a aplicação uma única vez com `FLYWAY_BASELINE_ON_MIGRATE=true`. Depois remova essa variável para que divergências futuras voltem a interromper a inicialização.
+
 ## Testes
 
-A suíte unitária e o teste de contexto usam H2 em memória:
+A suíte unitária e os testes de integração usam H2 em memória. O teste de contexto executa a migration inicial e valida o schema com Hibernate:
 
 ```bash
 ./mvnw test
