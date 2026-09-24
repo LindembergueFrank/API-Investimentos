@@ -18,6 +18,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -139,7 +140,7 @@ class UserControllerWebMvcTest {
                 .andExpect(content().string(""));
 
         verify(userService).updateUserById(
-                id,
+                eq(id),
                 argThat(dto -> dto.username().equals("new-username") && dto.password() == null)
         );
     }
