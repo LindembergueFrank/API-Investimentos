@@ -28,13 +28,14 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 ## Segurança aplicada
 
 - senhas são armazenadas com **BCrypt**;
+- autenticação usa access tokens JWT assinados com HS256 e expiração curta;
+- a API é stateless e exige token nos endpoints protegidos;
+- a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
 - configuração local utiliza variáveis de ambiente;
 - `.env` é ignorado pelo Git e `.env.example` contém apenas valores de referência;
 - testes usam banco H2 em memória e não dependem de credenciais externas.
-
-> O projeto ainda não implementa autenticação/autorização. BCrypt protege o armazenamento das credenciais, mas autenticação com Spring Security permanece no roadmap.
 
 ## Exemplo de criação
 
@@ -64,6 +65,32 @@ Resposta `201 Created`:
 ```
 
 A senha não faz parte do contrato de resposta.
+
+## Autenticação
+
+O cadastro e a emissão de token são públicos. Os demais endpoints exigem um access token JWT no header `Authorization: Bearer <token>`. O token expira em 15 minutos por padrão e a API não cria sessão no servidor.
+
+Gere uma chave exclusiva para o ambiente antes de iniciar a aplicação:
+
+```bash
+openssl rand -base64 32
+```
+
+Defina o resultado em `AUTH_JWT_SECRET_BASE64`. A aplicação interrompe a inicialização quando a chave está ausente, não é Base64 válida ou possui menos de 256 bits.
+
+Para autenticar:
+
+```http
+POST /v1/auth/token
+Content-Type: application/json
+
+{
+  "email": "investidor@example.com",
+  "password": "uma-senha-forte"
+}
+```
+
+Credenciais inválidas retornam a mesma resposta genérica, sem indicar se o e-mail está cadastrado.
 
 ## Executando localmente
 
@@ -103,11 +130,11 @@ docker compose down -v
 docker compose up -d
 ```
 
-Esse comando remove os dados locais. Para preservar um banco existente, faça backup, confira se o schema corresponde à migration `V1` e execute a aplicação uma única vez com `FLYWAY_BASELINE_ON_MIGRATE=true`. Depois remova essa variável para que divergências futuras voltem a interromper a inicialização.
+Esse comando remove os dados locais. Para preservar um banco existente, faça backup, confira se o schema corresponde às migrations publicadas e execute a aplicação uma única vez com `FLYWAY_BASELINE_ON_MIGRATE=true`. Depois remova essa variável para que divergências futuras voltem a interromper a inicialização.
 
 ## Testes
 
-A suíte unitária e os testes de integração usam H2 em memória. O teste de contexto executa a migration inicial e valida o schema com Hibernate:
+A suíte unitária e os testes de integração usam H2 em memória. O teste de contexto executa as migrations versionadas e valida o schema com Hibernate:
 
 ```bash
 ./mvnw test
@@ -134,9 +161,11 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. autenticação e autorização com Spring Security;
-2. modelagem do domínio de investimentos;
-3. observabilidade e configuração de produção.
+1. refresh tokens rotativos e encerramento de sessão;
+2. verificação de e-mail e recuperação de senha;
+3. perfis e autorização por recurso;
+4. modelagem do domínio de investimentos;
+5. observabilidade e configuração de produção.
 
 ## Princípios de contribuição
 

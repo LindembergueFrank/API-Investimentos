@@ -1,5 +1,6 @@
 package api_tech.api_investimentos.common.api;
 
+import api_tech.api_investimentos.identity.application.InvalidCredentialsException;
 import api_tech.api_investimentos.identity.application.UserNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -87,6 +88,22 @@ public class ApiExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 RESOURCE_NOT_FOUND,
                 "Resource not found",
+                exception.getMessage(),
+                request
+        );
+
+        return response(problem);
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidCredentials(
+            InvalidCredentialsException exception,
+            WebRequest request
+    ) {
+        var problem = problem(
+                HttpStatus.UNAUTHORIZED,
+                problemType("invalid-credentials"),
+                "Invalid credentials",
                 exception.getMessage(),
                 request
         );
