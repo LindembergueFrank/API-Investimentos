@@ -2,7 +2,7 @@ CREATE TABLE tb_refresh_token (
     id BINARY(16) NOT NULL,
     user_id BINARY(16) NOT NULL,
     family_id BINARY(16) NOT NULL,
-    token_hash CHAR(64) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
     expires_at TIMESTAMP(6) NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
     revoked_at TIMESTAMP(6),
