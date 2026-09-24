@@ -1,8 +1,10 @@
-package api_tech.api_investimentos.controller;
+package api_tech.api_investimentos.identity.api;
 
 import api_tech.api_investimentos.common.api.ProblemDetailResponse;
-import api_tech.api_investimentos.service.UserNotFoundException;
-import api_tech.api_investimentos.service.UserService;
+import api_tech.api_investimentos.identity.application.CreateUserCommand;
+import api_tech.api_investimentos.identity.application.UpdateUserCommand;
+import api_tech.api_investimentos.identity.application.UserNotFoundException;
+import api_tech.api_investimentos.identity.application.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -48,7 +50,12 @@ public class UserController {
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
     })
     public ResponseEntity<UserResponseDto> createUser(@Valid @RequestBody CreateUserDto createUserDto) {
-        UUID userId = userService.createUser(createUserDto);
+        var command = new CreateUserCommand(
+                createUserDto.username(),
+                createUserDto.email(),
+                createUserDto.password()
+        );
+        UUID userId = userService.createUser(command);
         var createdUser = userService.getUserById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
         URI location = URI.create("/v1/users/" + userId);
@@ -104,7 +111,8 @@ public class UserController {
             @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateUserDto updateUserDto
     ) {
-        userService.updateUserById(id, updateUserDto);
+        var command = new UpdateUserCommand(updateUserDto.username(), updateUserDto.password());
+        userService.updateUserById(id, command);
         return ResponseEntity.noContent().build();
     }
 

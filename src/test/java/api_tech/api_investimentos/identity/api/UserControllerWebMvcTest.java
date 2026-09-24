@@ -1,7 +1,9 @@
-package api_tech.api_investimentos.controller;
+package api_tech.api_investimentos.identity.api;
 
-import api_tech.api_investimentos.entity.User;
-import api_tech.api_investimentos.service.UserService;
+import api_tech.api_investimentos.identity.application.CreateUserCommand;
+import api_tech.api_investimentos.identity.application.UpdateUserCommand;
+import api_tech.api_investimentos.identity.application.UserService;
+import api_tech.api_investimentos.identity.domain.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +49,11 @@ class UserControllerWebMvcTest {
         var user = sampleUser();
         var request = new CreateUserDto(user.getUsername(), user.getEmail(), "plain-password");
 
-        when(userService.createUser(request)).thenReturn(user.getId());
+        when(userService.createUser(new CreateUserCommand(
+                request.username(),
+                request.email(),
+                request.password()
+        ))).thenReturn(user.getId());
         when(userService.getUserById(user.getId())).thenReturn(Optional.of(user));
 
         mockMvc.perform(post("/v1/users")
@@ -141,7 +147,7 @@ class UserControllerWebMvcTest {
 
         verify(userService).updateUserById(
                 eq(id),
-                argThat(dto -> dto.username().equals("new-username") && dto.password() == null)
+                argThat(command -> command.equals(new UpdateUserCommand("new-username", null)))
         );
     }
 

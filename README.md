@@ -119,22 +119,24 @@ O mesmo comando é executado automaticamente pelo GitHub Actions em pushes e pul
 
 ```text
 src/main/java/api_tech/api_investimentos/
-├── config/       # configuração técnica, como PasswordEncoder
-├── controller/   # endpoints e DTOs HTTP
-├── entity/       # entidades JPA
-├── repository/   # persistência
-└── service/      # regras de aplicação
+├── common/api/               # contrato comum de erros HTTP
+├── config/                   # configurações técnicas compartilhadas
+└── identity/
+    ├── api/                  # controllers e DTOs HTTP
+    ├── application/          # casos de uso, comandos e portas
+    ├── domain/               # modelo de identidade
+    └── infrastructure/       # adaptadores de persistência
 ```
+
+Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infraestrutura no mesmo módulo. DTOs HTTP são convertidos em comandos antes de entrar na aplicação, e o serviço depende da porta `UserRepository`, não do Spring Data diretamente.
 
 ## Roadmap de engenharia
 
 Próximas evoluções priorizadas:
 
-1. migrations com Flyway;
-2. organização por funcionalidade;
-3. autenticação e autorização com Spring Security;
-4. modelagem do domínio de investimentos;
-5. observabilidade e configuração de produção.
+1. autenticação e autorização com Spring Security;
+2. modelagem do domínio de investimentos;
+3. observabilidade e configuração de produção.
 
 ## Princípios de contribuição
 

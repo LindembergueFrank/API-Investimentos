@@ -1,9 +1,6 @@
-package api_tech.api_investimentos.service;
+package api_tech.api_investimentos.identity.application;
 
-import api_tech.api_investimentos.controller.CreateUserDto;
-import api_tech.api_investimentos.controller.UpdateUserDto;
-import api_tech.api_investimentos.entity.User;
-import api_tech.api_investimentos.repository.UserRepository;
+import api_tech.api_investimentos.identity.domain.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -66,7 +63,7 @@ class UserServiceTest {
                     Instant.now(),
                     null
             );
-            var input = new CreateUserDto(
+            var input = new CreateUserCommand(
                     "usernameteste",
                     "emailteste@replay.com",
                     "Senhateste001"
@@ -89,7 +86,7 @@ class UserServiceTest {
         @Test
         @DisplayName("Deve propagar exceção quando a persistência falhar")
         void shouldThrowExceptionWhenErrorOccurs() {
-            var input = new CreateUserDto(
+            var input = new CreateUserCommand(
                     "usernameteste",
                     "emailteste@replay.com",
                     "Senhateste001"
@@ -156,7 +153,7 @@ class UserServiceTest {
         @Test
         @DisplayName("Deve atualizar usuário e armazenar nova senha codificada")
         void shouldUpdateUserByIdWhenUserAndPasswordExist() {
-            var updateUserDto = new UpdateUserDto("newusername", "newpassword");
+            var updateUserDto = new UpdateUserCommand("newusername", "newpassword");
             var user = sampleUser();
 
             doReturn(Optional.of(user))
@@ -179,7 +176,7 @@ class UserServiceTest {
         @Test
         @DisplayName("Deve informar quando o usuário a atualizar não existir")
         void shouldThrowWhenUpdatingMissingUser() {
-            var updateUserDto = new UpdateUserDto("newusername", "newpassword");
+            var updateUserDto = new UpdateUserCommand("newusername", "newpassword");
             var id = UUID.randomUUID();
 
             doReturn(Optional.empty())

@@ -1,9 +1,6 @@
-package api_tech.api_investimentos.service;
+package api_tech.api_investimentos.identity.application;
 
-import api_tech.api_investimentos.controller.CreateUserDto;
-import api_tech.api_investimentos.controller.UpdateUserDto;
-import api_tech.api_investimentos.entity.User;
-import api_tech.api_investimentos.repository.UserRepository;
+import api_tech.api_investimentos.identity.domain.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -23,12 +20,12 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public UUID createUser(CreateUserDto createUserDto) {
+    public UUID createUser(CreateUserCommand command) {
         var entity = new User(
                 UUID.randomUUID(),
-                createUserDto.username(),
-                createUserDto.email(),
-                passwordEncoder.encode(createUserDto.password()),
+                command.username(),
+                command.email(),
+                passwordEncoder.encode(command.password()),
                 Instant.now(),
                 null
         );
@@ -45,16 +42,16 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    public void updateUserById(UUID id, UpdateUserDto updateUserDto) {
+    public void updateUserById(UUID id, UpdateUserCommand command) {
         var user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
 
-        if (updateUserDto.username() != null && !updateUserDto.username().isBlank()) {
-            user.setUsername(updateUserDto.username());
+        if (command.username() != null && !command.username().isBlank()) {
+            user.setUsername(command.username());
         }
 
-        if (updateUserDto.password() != null && !updateUserDto.password().isBlank()) {
-            user.setPassword(passwordEncoder.encode(updateUserDto.password()));
+        if (command.password() != null && !command.password().isBlank()) {
+            user.setPassword(passwordEncoder.encode(command.password()));
         }
 
         userRepository.save(user);
