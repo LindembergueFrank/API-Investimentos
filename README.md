@@ -31,6 +31,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - autenticação usa access tokens JWT assinados com HS256 e expiração curta;
 - refresh tokens são opacos, rotativos e persistidos somente como hash SHA-256;
 - a reutilização de um refresh token revogado invalida toda a família da sessão;
+- famílias de sessões totalmente expiradas são removidas em lotes após uma retenção de segurança;
 - os endpoints de autenticação possuem limite configurável por endereço de origem;
 - a API é stateless e exige token nos endpoints protegidos;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
@@ -112,6 +113,8 @@ Para encerrar a sessão, use `POST /v1/auth/revoke` com o mesmo corpo. A respost
 
 Os três endpoints de autenticação compartilham, por endereço de origem, um limite padrão de 20 requisições por minuto. Ao excedê-lo, a API responde `429` em Problem Details, informa `Retry-After` e não processa a credencial. Ajuste `AUTH_RATE_LIMIT_MAX_REQUESTS` e `AUTH_RATE_LIMIT_WINDOW` conforme o ambiente. O limitador é local à instância; múltiplas réplicas exigirão armazenamento compartilhado em uma evolução posterior. A aplicação usa apenas o endereço remoto fornecido pelo servidor e não confia diretamente em headers encaminhados pelo cliente.
 
+A limpeza de sessões roda, por padrão, a cada hora e remove no máximo 500 famílias por execução. Uma família só é elegível quando todos os seus tokens expiraram há pelo menos sete dias; assim, um token ancestral não é apagado enquanto ainda pode existir um descendente válido cuja reutilização precise ser detectada. Configure esse comportamento com `AUTH_REFRESH_TOKEN_CLEANUP_ENABLED`, `AUTH_REFRESH_TOKEN_CLEANUP_INTERVAL`, `AUTH_REFRESH_TOKEN_CLEANUP_RETENTION` e `AUTH_REFRESH_TOKEN_CLEANUP_BATCH_SIZE`.
+
 ## Executando localmente
 
 ### Pré-requisitos
@@ -181,11 +184,10 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. limpeza segura e observável de sessões expiradas;
-2. perfis e autorização por recurso;
-3. modelagem do domínio de investimentos;
-4. verificação de e-mail e recuperação de senha;
-5. observabilidade, rate limiting distribuído e configuração de produção.
+1. perfis e autorização por recurso;
+2. modelagem do domínio de investimentos;
+3. verificação de e-mail e recuperação de senha;
+4. observabilidade, rate limiting distribuído e configuração de produção.
 
 ## Princípios de contribuição
 
