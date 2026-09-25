@@ -1,4 +1,4 @@
-package api_tech.api_investimentos.entity;
+package api_tech.api_investimentos.identity.domain;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -14,13 +14,13 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "username")
+    @Column(name = "username", nullable = false, length = 50)
     private String username;
 
-    @Column(name = "email")
+    @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password")
+    @Column(name = "password", nullable = false, length = 72)
     private String password;
 
     @CreationTimestamp
