@@ -77,9 +77,30 @@ class AuthRateLimitIntegrationTest {
                 .andExpect(status().isTooManyRequests());
     }
 
+    @Test
+    void shouldApplyTheLimitWhenTheApplicationUsesAContextPath() throws Exception {
+        String client = "198.51.100.30";
+        var request = new LoginRequest("missing@example.com", "context-path-secret");
+
+        invalidLoginWithContextPath(client, request);
+        invalidLoginWithContextPath(client, request);
+
+        mockMvc.perform(from(client, "/investments/v1/auth/token")
+                        .contextPath("/investments")
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isTooManyRequests());
+    }
+
     private void invalidLogin(String client, String forwardedFor, LoginRequest request) throws Exception {
         mockMvc.perform(from(client, "/v1/auth/token")
                         .header("X-Forwarded-For", forwardedFor)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private void invalidLoginWithContextPath(String client, LoginRequest request) throws Exception {
+        mockMvc.perform(from(client, "/investments/v1/auth/token")
+                        .contextPath("/investments")
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isUnauthorized());
     }

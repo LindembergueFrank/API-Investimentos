@@ -34,7 +34,16 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !HttpMethod.POST.matches(request.getMethod()) || !PROTECTED_PATHS.contains(request.getServletPath());
+        return !HttpMethod.POST.matches(request.getMethod()) || !PROTECTED_PATHS.contains(pathWithinApplication(request));
+    }
+
+    private static String pathWithinApplication(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath == null || contextPath.isEmpty()) {
+            return requestUri;
+        }
+        return requestUri.startsWith(contextPath) ? requestUri.substring(contextPath.length()) : requestUri;
     }
 
     @Override
