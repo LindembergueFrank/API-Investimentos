@@ -5,6 +5,7 @@ import api_tech.api_investimentos.identity.application.RefreshTokenRepository;
 import api_tech.api_investimentos.identity.application.UserRepository;
 import api_tech.api_investimentos.identity.domain.RefreshToken;
 import api_tech.api_investimentos.identity.domain.User;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,6 +44,9 @@ class ExpiredSessionCleanupIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -91,6 +95,7 @@ class ExpiredSessionCleanupIntegrationTest {
                 NOW,
                 NOW
         ));
+        entityManager.flush();
         return id;
     }
 
