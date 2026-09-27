@@ -87,7 +87,7 @@ class ExpiredSessionCleanupIntegrationTest {
 
     private UUID saveUser() {
         UUID id = UUID.randomUUID();
-        userRepository.save(new User(
+        var savedUser = userRepository.save(new User(
                 id,
                 "cleanup-user",
                 "cleanup-" + id + "@example.com",
@@ -96,7 +96,7 @@ class ExpiredSessionCleanupIntegrationTest {
                 NOW
         ));
         entityManager.flush();
-        return id;
+        return savedUser.getId();
     }
 
     private void saveToken(UUID userId, UUID familyId, Instant expiresAt) {
