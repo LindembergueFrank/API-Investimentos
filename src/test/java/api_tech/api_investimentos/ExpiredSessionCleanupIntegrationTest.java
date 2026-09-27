@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Transactional
 @Import(ExpiredSessionCleanupIntegrationTest.FixedClockConfig.class)
 @TestPropertySource(properties = {
+        "spring.datasource.url=jdbc:h2:mem:expired-session-cleanup;MODE=MySQL;DB_CLOSE_DELAY=-1",
         "security.refresh-token.cleanup.enabled=false",
         "security.refresh-token.cleanup.retention=P7D",
         "security.refresh-token.cleanup.batch-size=2"
