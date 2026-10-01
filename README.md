@@ -11,10 +11,10 @@ A API implementa CRUD básico de usuários em `/v1/users`.
 | Método | Endpoint | Descrição |
 | --- | --- | --- |
 | `POST` | `/v1/users` | cria um usuário |
-| `GET` | `/v1/users/{id}` | consulta um usuário |
-| `GET` | `/v1/users` | lista usuários |
-| `PATCH` | `/v1/users/{id}` | atualiza nome e/ou senha |
-| `DELETE` | `/v1/users/{id}` | remove um usuário |
+| `GET` | `/v1/users/{id}` | consulta o próprio usuário |
+| `GET` | `/v1/users` | lista usuários (reservado a administradores) |
+| `PATCH` | `/v1/users/{id}` | atualiza nome e/ou senha do próprio usuário |
+| `DELETE` | `/v1/users/{id}` | remove o próprio usuário |
 
 ## Documentação da API
 
@@ -34,6 +34,8 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - famílias de sessões totalmente expiradas são removidas em lotes após uma retenção de segurança;
 - os endpoints de autenticação possuem limite configurável por endereço de origem;
 - a API é stateless e exige token nos endpoints protegidos;
+- o identificador do proprietário vem do `sub` assinado do JWT; um usuário não pode consultar, alterar ou excluir outro cadastro;
+- a listagem de usuários exige o papel `ADMIN` e permanece inacessível enquanto perfis administrativos não forem emitidos nos tokens;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
@@ -184,7 +186,7 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. perfis e autorização por recurso;
+1. perfis `USER`, `PROFESSIONAL` e `ADMIN`;
 2. modelagem do domínio de investimentos;
 3. verificação de e-mail e recuperação de senha;
 4. observabilidade, rate limiting distribuído e configuração de produção.

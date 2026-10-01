@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -66,6 +67,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@userResourceAuthorization.isOwner(authentication, #id)")
     @Operation(summary = "Consulta um usuário pelo identificador")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuário encontrado",
@@ -75,6 +77,9 @@ public class UserController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Recurso pertence a outro usuário",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
     })
@@ -86,10 +91,16 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Lista usuários")
-    @ApiResponse(responseCode = "200", description = "Usuários cadastrados",
-            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-                    array = @ArraySchema(schema = @Schema(implementation = UserResponseDto.class))))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuários cadastrados",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            array = @ArraySchema(schema = @Schema(implementation = UserResponseDto.class)))),
+            @ApiResponse(responseCode = "403", description = "Papel administrativo obrigatório",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class)))
+    })
     public ResponseEntity<List<UserResponseDto>> listUsers() {
         var users = userService.listUsers().stream()
                 .map(UserResponseDto::from)
@@ -99,6 +110,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("@userResourceAuthorization.isOwner(authentication, #id)")
     @Operation(summary = "Atualiza parcialmente um usuário")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Usuário atualizado"),
@@ -106,6 +118,9 @@ public class UserController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Recurso pertence a outro usuário",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
     })
@@ -119,6 +134,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@userResourceAuthorization.isOwner(authentication, #id)")
     @Operation(summary = "Remove um usuário")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Usuário removido"),
@@ -126,6 +142,9 @@ public class UserController {
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Recurso pertence a outro usuário",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
     })
