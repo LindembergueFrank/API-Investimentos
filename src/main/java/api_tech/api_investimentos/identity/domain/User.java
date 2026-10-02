@@ -23,6 +23,10 @@ public class User {
     @Column(name = "password", nullable = false, length = 72)
     private String password;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private UserRole role = UserRole.USER;
+
     @CreationTimestamp
     @Column(name = "creation_timestamp")
     private Instant creationTimestamp;
@@ -38,8 +42,17 @@ public class User {
         this.username = username;
         this.email = email;
         this.password = password;
+        this.role = UserRole.USER;
         this.creationTimestamp = creationTimestamp;
         this.updateTimestamp = updateTimestamp;
+    }
+
+    public UserRole getRole() {
+        return role;
+    }
+
+    public void setRole(UserRole role) {
+        this.role = role;
     }
 
     public UUID getId() {
