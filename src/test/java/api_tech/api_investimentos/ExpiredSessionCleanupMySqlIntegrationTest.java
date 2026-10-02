@@ -82,7 +82,7 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
         saveToken(userId, activeFamily, NOW.minusSeconds(30 * 24 * 60 * 60L));
         saveToken(userId, activeFamily, NOW.plusSeconds(24 * 60 * 60L));
 
-        assertEquals("4", latestFlywayVersion());
+        assertEquals("5", latestFlywayVersion());
         assertEquals(2, cleanupIndexColumnCount());
         assertEquals(2, cleanupService.cleanupBatch());
         assertEquals(2, tokenCount());

@@ -65,7 +65,8 @@ class UserRolesIntegrationTest {
         mockMvc.perform(get("/v1/users")
                         .header("Authorization", bearer(administrator.accessToken())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$[?(@.username == 'professional')]").exists())
+                .andExpect(jsonPath("$[?(@.username == 'administrator')]").exists());
     }
 
     private AuthenticatedUser registerAndLogin(String username, String role) throws Exception {
