@@ -3,6 +3,7 @@ package api_tech.api_investimentos.common.api;
 import api_tech.api_investimentos.identity.application.InvalidCredentialsException;
 import api_tech.api_investimentos.identity.application.InvalidRefreshTokenException;
 import api_tech.api_investimentos.identity.application.UserNotFoundException;
+import api_tech.api_investimentos.portfolio.application.PortfolioNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -83,6 +84,22 @@ public class ApiExceptionHandler {
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ProblemDetail> handleUserNotFound(
             UserNotFoundException exception,
+            WebRequest request
+    ) {
+        var problem = problem(
+                HttpStatus.NOT_FOUND,
+                RESOURCE_NOT_FOUND,
+                "Resource not found",
+                exception.getMessage(),
+                request
+        );
+
+        return response(problem);
+    }
+
+    @ExceptionHandler(PortfolioNotFoundException.class)
+    public ResponseEntity<ProblemDetail> handlePortfolioNotFound(
+            PortfolioNotFoundException exception,
             WebRequest request
     ) {
         var problem = problem(

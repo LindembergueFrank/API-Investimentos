@@ -6,7 +6,7 @@ O projeto começou pelo domínio de usuários e está sendo gradualmente elevado
 
 ## Estado atual
 
-A API implementa CRUD básico de usuários em `/v1/users`.
+A API implementa identidade segura e o primeiro recorte do domínio de carteiras.
 
 | Método | Endpoint | Descrição |
 | --- | --- | --- |
@@ -15,6 +15,9 @@ A API implementa CRUD básico de usuários em `/v1/users`.
 | `GET` | `/v1/users` | lista usuários (reservado a administradores) |
 | `PATCH` | `/v1/users/{id}` | atualiza nome e/ou senha do próprio usuário |
 | `DELETE` | `/v1/users/{id}` | remove o próprio usuário |
+| `POST` | `/v1/portfolios` | cria uma carteira para o usuário autenticado |
+| `GET` | `/v1/portfolios` | lista somente as carteiras do usuário autenticado |
+| `GET` | `/v1/portfolios/{id}` | consulta uma carteira do próprio usuário |
 
 ## Documentação da API
 
@@ -38,6 +41,8 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - os papéis `USER`, `PROFESSIONAL` e `ADMIN` seguem privilégio mínimo; todo cadastro público recebe exclusivamente `USER`;
 - o papel é carregado do banco no login e incluído no token como autoridade; somente `ADMIN` pode listar usuários;
 - não existe endpoint público para promover papéis: a atribuição de `PROFESSIONAL` ou `ADMIN` deve ocorrer por processo administrativo controlado;
+- a carteira recebe o proprietário exclusivamente do `sub` assinado do JWT; identificadores enviados pelo cliente não definem propriedade;
+- consultas de carteira filtram simultaneamente pelo identificador do recurso e pelo proprietário, impedindo acesso horizontal;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
@@ -175,11 +180,12 @@ O mesmo comando é executado automaticamente pelo GitHub Actions em pushes e pul
 src/main/java/api_tech/api_investimentos/
 ├── common/api/               # contrato comum de erros HTTP
 ├── config/                   # configurações técnicas compartilhadas
-└── identity/
+├── identity/
     ├── api/                  # controllers e DTOs HTTP
     ├── application/          # casos de uso, comandos e portas
     ├── domain/               # modelo de identidade
     └── infrastructure/       # adaptadores de persistência
+└── portfolio/                # mesmas fronteiras para carteiras do usuário
 ```
 
 Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infraestrutura no mesmo módulo. DTOs HTTP são convertidos em comandos antes de entrar na aplicação, e o serviço depende da porta `UserRepository`, não do Spring Data diretamente.
@@ -188,10 +194,10 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. perfis `USER`, `PROFESSIONAL` e `ADMIN`;
-2. modelagem do domínio de investimentos;
-3. verificação de e-mail e recuperação de senha;
-4. observabilidade, rate limiting distribuído e configuração de produção.
+1. ativos suportados pela carteira;
+2. operações de compra e venda;
+3. posição e preço médio;
+4. verificação de e-mail, recuperação de senha e observabilidade.
 
 ## Princípios de contribuição
 
