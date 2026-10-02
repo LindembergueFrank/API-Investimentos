@@ -4,7 +4,6 @@ import api_tech.api_investimentos.portfolio.domain.Portfolio;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -28,7 +27,10 @@ public class PortfolioService {
     }
 
     @Transactional(readOnly = true)
-    public List<Portfolio> listByOwner(UUID ownerId) {
-        return portfolioRepository.findAllByOwnerIdOrderByCreatedAtAsc(ownerId);
+    public PortfolioPage listByOwner(UUID ownerId, int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new InvalidPaginationException();
+        }
+        return portfolioRepository.findPageByOwnerId(ownerId, page, size);
     }
 }

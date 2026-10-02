@@ -16,7 +16,7 @@ A API implementa identidade segura e o primeiro recorte do domínio de carteiras
 | `PATCH` | `/v1/users/{id}` | atualiza nome e/ou senha do próprio usuário |
 | `DELETE` | `/v1/users/{id}` | remove o próprio usuário |
 | `POST` | `/v1/portfolios` | cria uma carteira para o usuário autenticado |
-| `GET` | `/v1/portfolios` | lista somente as carteiras do usuário autenticado |
+| `GET` | `/v1/portfolios?page=0&size=20` | lista uma página das carteiras do usuário autenticado |
 | `GET` | `/v1/portfolios/{id}` | consulta uma carteira do próprio usuário |
 
 ## Documentação da API
@@ -43,6 +43,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - não existe endpoint público para promover papéis: a atribuição de `PROFESSIONAL` ou `ADMIN` deve ocorrer por processo administrativo controlado;
 - a carteira recebe o proprietário exclusivamente do `sub` assinado do JWT; identificadores enviados pelo cliente não definem propriedade;
 - consultas de carteira filtram simultaneamente pelo identificador do recurso e pelo proprietário, impedindo acesso horizontal;
+- a listagem de carteiras é paginada, ordenada de forma estável e limitada a 100 itens por página;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;

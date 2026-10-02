@@ -4,7 +4,6 @@ import api_tech.api_investimentos.common.api.ProblemDetailResponse;
 import api_tech.api_investimentos.portfolio.application.CreatePortfolioCommand;
 import api_tech.api_investimentos.portfolio.application.PortfolioService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -20,10 +19,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -57,12 +56,19 @@ public class PortfolioController {
 
     @GetMapping
     @Operation(summary = "Lista as carteiras do usuário autenticado")
-    @ApiResponse(responseCode = "200", description = "Carteiras do usuário",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PortfolioResponse.class))))
-    public ResponseEntity<List<PortfolioResponse>> list(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(portfolioService.listByOwner(ownerId(jwt)).stream()
-                .map(PortfolioResponse::from)
-                .toList());
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Página de carteiras do usuário",
+                    content = @Content(schema = @Schema(implementation = PortfolioPageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Paginação inválida",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class)))
+    })
+    public ResponseEntity<PortfolioPageResponse> list(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(PortfolioPageResponse.from(portfolioService.listByOwner(ownerId(jwt), page, size)));
     }
 
     @GetMapping("/{id}")

@@ -2,7 +2,6 @@ package api_tech.api_investimentos.portfolio.application;
 
 import api_tech.api_investimentos.portfolio.domain.Portfolio;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,5 +11,5 @@ public interface PortfolioRepository {
 
     Optional<Portfolio> findByIdAndOwnerId(UUID id, UUID ownerId);
 
-    List<Portfolio> findAllByOwnerIdOrderByCreatedAtAsc(UUID ownerId);
+    PortfolioPage findPageByOwnerId(UUID ownerId, int page, int size);
 }

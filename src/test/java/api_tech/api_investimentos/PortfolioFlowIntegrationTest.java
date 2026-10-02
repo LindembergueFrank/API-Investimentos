@@ -36,15 +36,26 @@ class PortfolioFlowIntegrationTest {
         String ownerToken = registerAndLogin("portfolio-owner");
         String otherToken = registerAndLogin("portfolio-other");
 
-        UUID ownerPortfolio = createPortfolio(ownerToken, "Long term");
+        createPortfolio(ownerToken, "Long term");
+        createPortfolio(ownerToken, "Short term");
         UUID otherPortfolio = createPortfolio(otherToken, "Other private portfolio");
 
         mockMvc.perform(get("/v1/portfolios")
                         .header("Authorization", bearer(ownerToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(ownerPortfolio.toString()))
-                .andExpect(jsonPath("$[0].name").value("Long term"));
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(1));
+
+        mockMvc.perform(get("/v1/portfolios?page=1&size=1")
+                        .header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
 
         mockMvc.perform(get("/v1/portfolios/{id}", otherPortfolio)
                         .header("Authorization", bearer(ownerToken)))
@@ -68,6 +79,12 @@ class PortfolioFlowIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.errors[0].field").value("name"));
+
+        mockMvc.perform(get("/v1/portfolios?page=-1&size=101")
+                        .header("Authorization", bearer(accessToken)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Invalid request parameter"));
     }
 
     private UUID createPortfolio(String accessToken, String name) throws Exception {
