@@ -18,6 +18,8 @@ A API implementa identidade segura e o primeiro recorte do domínio de carteiras
 | `POST` | `/v1/portfolios` | cria uma carteira para o usuário autenticado |
 | `GET` | `/v1/portfolios?page=0&size=20` | lista uma página das carteiras do usuário autenticado |
 | `GET` | `/v1/portfolios/{id}` | consulta uma carteira do próprio usuário |
+| `POST` | `/v1/assets` | cadastra ativo no catálogo (somente `ADMIN`) |
+| `GET` | `/v1/assets?page=0&size=20` | lista o catálogo para usuários autenticados |
 
 ## Documentação da API
 
@@ -44,6 +46,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - a carteira recebe o proprietário exclusivamente do `sub` assinado do JWT; identificadores enviados pelo cliente não definem propriedade;
 - consultas de carteira filtram simultaneamente pelo identificador do recurso e pelo proprietário, impedindo acesso horizontal;
 - a listagem de carteiras é paginada, ordenada de forma estável e limitada a 100 itens por página;
+- ativos são normalizados e únicos por mercado + ticker; apenas administradores alteram o catálogo compartilhado;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
@@ -186,7 +189,8 @@ src/main/java/api_tech/api_investimentos/
     ├── application/          # casos de uso, comandos e portas
     ├── domain/               # modelo de identidade
     └── infrastructure/       # adaptadores de persistência
-└── portfolio/                # mesmas fronteiras para carteiras do usuário
+├── portfolio/                # mesmas fronteiras para carteiras do usuário
+└── asset/                    # catálogo controlado de ativos
 ```
 
 Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infraestrutura no mesmo módulo. DTOs HTTP são convertidos em comandos antes de entrar na aplicação, e o serviço depende da porta `UserRepository`, não do Spring Data diretamente.
@@ -195,9 +199,9 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. ativos suportados pela carteira;
-2. operações de compra e venda;
-3. posição e preço médio;
+1. operações de compra e venda;
+2. posição e preço médio;
+3. associação entre carteira e ativos;
 4. verificação de e-mail, recuperação de senha e observabilidade.
 
 ## Princípios de contribuição
