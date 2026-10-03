@@ -1,5 +1,6 @@
 package api_tech.api_investimentos.common.api;
 
+import api_tech.api_investimentos.asset.application.AssetAlreadyExistsException;
 import api_tech.api_investimentos.identity.application.InvalidCredentialsException;
 import api_tech.api_investimentos.identity.application.InvalidRefreshTokenException;
 import api_tech.api_investimentos.identity.application.UserNotFoundException;
@@ -27,6 +28,7 @@ public class ApiExceptionHandler {
     private static final URI INVALID_PARAMETER = problemType("invalid-parameter");
     private static final URI MALFORMED_REQUEST = problemType("malformed-request");
     private static final URI RESOURCE_NOT_FOUND = problemType("resource-not-found");
+    private static final URI RESOURCE_CONFLICT = problemType("resource-conflict");
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ProblemDetail> handleValidation(
@@ -126,6 +128,15 @@ public class ApiExceptionHandler {
                 exception.getMessage(),
                 request
         );
+        return response(problem);
+    }
+
+    @ExceptionHandler(AssetAlreadyExistsException.class)
+    public ResponseEntity<ProblemDetail> handleAssetAlreadyExists(
+            AssetAlreadyExistsException exception,
+            WebRequest request
+    ) {
+        var problem = problem(HttpStatus.CONFLICT, RESOURCE_CONFLICT, "Resource conflict", exception.getMessage(), request);
         return response(problem);
     }
 
