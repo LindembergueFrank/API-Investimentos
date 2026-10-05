@@ -7,6 +7,7 @@ import api_tech.api_investimentos.identity.api.CreateUserDto;
 import api_tech.api_investimentos.identity.api.LoginRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,6 +30,11 @@ class AssetCatalogIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void clearAssetCatalog() {
+        jdbcTemplate.update("DELETE FROM asset");
+    }
 
     @Test
     void shouldRestrictCreationToAdminAndExposeNormalizedCatalogToAuthenticatedUsers() throws Exception {
