@@ -9,6 +9,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
+import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public class JpaAssetRepository implements AssetRepository {
@@ -37,5 +39,10 @@ public class JpaAssetRepository implements AssetRepository {
         var sort = Sort.by("market").ascending().and(Sort.by("ticker").ascending());
         var result = repository.findAll(PageRequest.of(page, size, sort));
         return new AssetPage(result.getContent(), result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
+    }
+
+    @Override
+    public Optional<Asset> findById(UUID id) {
+        return repository.findById(id);
     }
 }

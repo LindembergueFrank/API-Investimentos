@@ -6,6 +6,9 @@ import api_tech.api_investimentos.identity.application.InvalidRefreshTokenExcept
 import api_tech.api_investimentos.identity.application.UserNotFoundException;
 import api_tech.api_investimentos.portfolio.application.PortfolioNotFoundException;
 import api_tech.api_investimentos.portfolio.application.InvalidPaginationException;
+import api_tech.api_investimentos.transaction.application.AssetNotFoundException;
+import api_tech.api_investimentos.transaction.application.IdempotencyConflictException;
+import api_tech.api_investimentos.transaction.application.InsufficientPositionException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -138,6 +141,16 @@ public class ApiExceptionHandler {
     ) {
         var problem = problem(HttpStatus.CONFLICT, RESOURCE_CONFLICT, "Resource conflict", exception.getMessage(), request);
         return response(problem);
+    }
+
+    @ExceptionHandler(AssetNotFoundException.class)
+    public ResponseEntity<ProblemDetail> handleAssetNotFound(AssetNotFoundException exception, WebRequest request) {
+        return response(problem(HttpStatus.NOT_FOUND, RESOURCE_NOT_FOUND, "Resource not found", exception.getMessage(), request));
+    }
+
+    @ExceptionHandler({InsufficientPositionException.class, IdempotencyConflictException.class})
+    public ResponseEntity<ProblemDetail> handleTransactionConflict(RuntimeException exception, WebRequest request) {
+        return response(problem(HttpStatus.CONFLICT, RESOURCE_CONFLICT, "Resource conflict", exception.getMessage(), request));
     }
 
     @ExceptionHandler(InvalidCredentialsException.class)

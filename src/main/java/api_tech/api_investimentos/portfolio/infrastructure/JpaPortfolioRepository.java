@@ -30,6 +30,11 @@ public class JpaPortfolioRepository implements PortfolioRepository {
     }
 
     @Override
+    public Optional<Portfolio> lockByIdAndOwnerId(UUID id, UUID ownerId) {
+        return repository.findForUpdateByIdAndOwnerId(id, ownerId);
+    }
+
+    @Override
     public PortfolioPage findPageByOwnerId(UUID ownerId, int page, int size) {
         var sort = Sort.by("createdAt").ascending().and(Sort.by("id").ascending());
         var result = repository.findAllByOwnerId(ownerId, PageRequest.of(page, size, sort));
