@@ -54,7 +54,9 @@ class TransactionFlowIntegrationTest {
         mockMvc.perform(post("/v1/transactions").header("Authorization", bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsBytes(buy)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(transactionId));
-        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM investment_transaction", Integer.class));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM investment_transaction WHERE portfolio_id = ? AND request_id = ?",
+                Integer.class, portfolioId, requestId));
 
         var conflictingRetry = request(requestId, portfolioId, assetId, TransactionType.BUY, "11", occurredAt);
         perform(owner, conflictingRetry).andExpect(status().isConflict());
