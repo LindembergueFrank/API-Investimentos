@@ -13,10 +13,19 @@ describe('App', () => {
   })
 
   it('opens the dashboard after a successful login without persisting tokens', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 900,
-      refreshToken: 'refresh-token', refreshExpiresIn: 2_592_000,
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({
+        accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 900,
+        refreshToken: 'refresh-token', refreshExpiresIn: 2_592_000,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'portfolio-1', name: 'Longo prazo' }], page: 0, size: 100, totalElements: 1, totalPages: 1,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      return Promise.resolve(new Response(JSON.stringify([{
+        assetId: 'asset-12345678', quantity: 2, averagePrice: 25, totalCost: 50,
+      }]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    })
     vi.stubGlobal('fetch', fetchMock)
     render(<App />)
 
@@ -24,9 +33,40 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
     fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
 
-    await waitFor(() => expect(screen.getByText('Sem posições abertas')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('R$ 25,00')).toBeInTheDocument())
     expect(screen.getByRole('navigation', { name: 'Navegação principal' })).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/v1/auth/token', expect.objectContaining({ method: 'POST' }))
+    expect(fetchMock).toHaveBeenCalledWith('/v1/portfolios?page=0&size=100', expect.objectContaining({
+      headers: { Authorization: 'Bearer access-token' },
+    }))
     expect(localStorage).toHaveLength(0)
+  })
+
+  it('shows an honest empty state when the user has no portfolios', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    await waitFor(() => expect(screen.getByText('Crie sua primeira carteira')).toBeInTheDocument())
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows the API problem when dashboard loading fails', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ title: 'Acesso negado', detail: 'A sessão não permite consultar esta carteira.' }), { status: 403 })))
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('A sessão não permite consultar esta carteira.')
   })
 })
