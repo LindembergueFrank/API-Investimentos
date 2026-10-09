@@ -35,7 +35,7 @@ public class JpaTransactionRepository implements TransactionRepository {
 
     @Override
     public List<InvestmentTransaction> findAllByPortfolioIdInLedgerOrder(UUID portfolioId) {
-        var sort = Sort.by("createdAt").ascending().and(Sort.by("id").ascending());
+        var sort = Sort.by("ledgerOrder").ascending();
         return repository.findAllByPortfolioId(portfolioId, sort);
     }
 

@@ -25,6 +25,7 @@ public class InvestmentTransaction {
     @Column(nullable = false, precision = 19, scale = 2) private BigDecimal fees;
     @Column(name = "occurred_at", nullable = false) private Instant occurredAt;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
+    @Column(name = "ledger_order", nullable = false, insertable = false, updatable = false) private Long ledgerOrder;
 
     protected InvestmentTransaction() {}
 
@@ -58,4 +59,5 @@ public class InvestmentTransaction {
     public BigDecimal getFees() { return fees; }
     public Instant getOccurredAt() { return occurredAt; }
     public Instant getCreatedAt() { return createdAt; }
+    public Long getLedgerOrder() { return ledgerOrder; }
 }

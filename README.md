@@ -52,7 +52,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - ativos são normalizados e únicos por mercado + ticker; apenas administradores alteram o catálogo compartilhado;
 - operações usam precisão decimal, chave idempotente por carteira e bloqueio pessimista para impedir vendas concorrentes acima da posição;
 - a linha do tempo de operações é paginada, limitada a 100 itens e ordenada de forma determinística;
-- posições são derivadas do livro de operações; taxas de compra compõem o custo e vendas não alteram o preço médio remanescente;
+- posições são derivadas na ordem monotônica do livro; taxas de compra compõem o custo e vendas não alteram o preço médio remanescente;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
