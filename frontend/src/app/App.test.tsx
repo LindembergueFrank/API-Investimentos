@@ -67,6 +67,60 @@ describe('App', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  it('switches between owned portfolios and reloads their details', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'portfolio-1', name: 'Longo prazo' }, { id: 'portfolio-2', name: 'Reserva' }], totalElements: 2,
+      }), { status: 200 }))
+      if (url.startsWith('/v1/assets?')) return Promise.resolve(new Response(JSON.stringify({ items: [], totalElements: 0 }), { status: 200 }))
+      if (url.includes('/positions')) return Promise.resolve(new Response(JSON.stringify(url.includes('portfolio-2') ? [{
+        assetId: 'asset-2', quantity: 5, averagePrice: 10, totalCost: 50,
+      }] : []), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    const selector = await screen.findByLabelText('Carteira')
+    fireEvent.change(selector, { target: { value: 'portfolio-2' } })
+
+    await waitFor(() => expect(screen.getByText('Reserva')).toBeInTheDocument())
+    expect(screen.getByText('5 unidades')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/v1/portfolios/portfolio-2/positions', expect.objectContaining({
+      headers: { Authorization: 'Bearer access-token' },
+    }))
+  })
+
+  it('keeps the current portfolio visible when switching fails', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'portfolio-1', name: 'Longo prazo' }, { id: 'portfolio-2', name: 'Reserva' }], totalElements: 2,
+      }), { status: 200 }))
+      if (url.startsWith('/v1/assets?')) return Promise.resolve(new Response(JSON.stringify({ items: [], totalElements: 0 }), { status: 200 }))
+      if (url.includes('portfolio-2')) return Promise.resolve(new Response(JSON.stringify({ detail: 'Carteira indisponível.' }), { status: 503 }))
+      if (url.includes('/positions')) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    fireEvent.change(await screen.findByLabelText('Carteira'), { target: { value: 'portfolio-2' } })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Carteira indisponível.')
+    expect(screen.getAllByText('Longo prazo').length).toBeGreaterThan(0)
+  })
+
   it('shows the API problem when dashboard loading fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()

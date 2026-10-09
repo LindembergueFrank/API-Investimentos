@@ -45,6 +45,11 @@ main { padding: 48px 4.5vw 64px; }
 .hero-row p { max-width: 610px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
 .primary-button, .secondary-button { border: 0; border-radius: 10px; font-weight: 750; }
 .primary-button { padding: 13px 18px; color: var(--white); background: var(--blue); box-shadow: 0 8px 20px rgb(37 99 235 / 20%); }
+.portfolio-selector { display: grid; gap: 6px; color: var(--muted); font-size: 11px; font-weight: 750; }
+.portfolio-selector select { min-width: 220px; padding: 11px 34px 11px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--navy); background: var(--white); }
+.portfolio-selector select:focus { outline: 3px solid rgb(37 99 235 / 14%); border-color: #7aa4f7; }
+.portfolio-selector select:disabled { cursor: wait; opacity: .65; }
+.inline-error { margin: -18px 0 24px; padding: 11px 14px; border: 1px solid #f3c5c1; border-radius: 10px; color: #8f241d; background: #fff4f3; font-size: 12px; }
 .secondary-button { padding: 11px 16px; color: #1f55c7; background: #edf3ff; }
 .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
 .summary-card, .panel { border: 1px solid var(--line); border-radius: 16px; background: var(--white); box-shadow: 0 8px 30px rgb(35 48 75 / 4%); }
