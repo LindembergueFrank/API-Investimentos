@@ -35,7 +35,11 @@ public class PositionController {
     @Operation(summary = "Lista as posições atuais da carteira do usuário autenticado")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Posições atuais",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = PositionResponse.class)))),
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            array = @ArraySchema(schema = @Schema(implementation = PositionResponse.class)))),
+            @ApiResponse(responseCode = "401", description = "Token ausente ou inválido",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetailResponse.class))),
             @ApiResponse(responseCode = "404", description = "Carteira inexistente ou pertencente a outro usuário",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetailResponse.class)))
