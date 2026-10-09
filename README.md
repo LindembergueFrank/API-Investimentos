@@ -54,6 +54,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - a linha do tempo de operações é paginada, limitada a 100 itens e ordenada de forma determinística;
 - posições são derivadas na ordem monotônica do livro; taxas de compra compõem o custo e vendas não alteram o preço médio remanescente;
 - o contrato de posições documenta explicitamente schemas de sucesso, autenticação e recurso não encontrado no OpenAPI;
+- CORS permanece fechado por padrão e aceita somente origens HTTP(S) exatas configuradas em `API_CORS_ALLOWED_ORIGINS`;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
