@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { loadDashboard, type Asset, type Portfolio, type Position, type Transaction } from './dashboardApi'
+import { loadDashboard, loadPortfolioDetails, type Asset, type Portfolio, type Position, type Transaction } from './dashboardApi'
 
 type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; assets: Map<string, Asset> }
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -11,6 +11,9 @@ export function DashboardPage() {
   const { session } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [portfolioError, setPortfolioError] = useState<string | null>(null)
+  const [isSwitchingPortfolio, setIsSwitchingPortfolio] = useState(false)
+  const portfolioRequest = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!session) return
@@ -24,8 +27,31 @@ export function DashboardPage() {
       .catch((cause: unknown) => {
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o painel.')
       })
-    return () => controller.abort()
+    return () => {
+      controller.abort()
+      portfolioRequest.current?.abort()
+    }
   }, [session])
+
+  async function selectPortfolio(portfolioId: string) {
+    if (!session || !data || portfolioId === data.selectedPortfolio?.id) return
+    const selectedPortfolio = data.portfolios.find((portfolio) => portfolio.id === portfolioId)
+    if (!selectedPortfolio) return
+
+    portfolioRequest.current?.abort()
+    const controller = new AbortController()
+    portfolioRequest.current = controller
+    setIsSwitchingPortfolio(true)
+    setPortfolioError(null)
+    try {
+      const details = await loadPortfolioDetails(portfolioId, session.accessToken, controller.signal)
+      setData((current) => current ? { ...current, ...details, selectedPortfolio } : current)
+    } catch (cause: unknown) {
+      if (!controller.signal.aborted) setPortfolioError(cause instanceof Error ? cause.message : 'Não foi possível carregar a carteira selecionada.')
+    } finally {
+      if (portfolioRequest.current === controller) setIsSwitchingPortfolio(false)
+    }
+  }
 
   if (error) return <div className="dashboard"><section className="panel status-panel" role="alert"><h1>Não foi possível carregar o painel</h1><p>{error}</p></section></div>
   if (!data) return <div className="dashboard"><section className="panel status-panel" aria-live="polite"><h1>Carregando seu painel…</h1><p>Consultando carteiras e posições com segurança.</p></section></div>
@@ -34,10 +60,15 @@ export function DashboardPage() {
     <div className="dashboard">
       <section className="hero-row">
         <div><span className="eyebrow">VISÃO GERAL</span><h1>Seu patrimônio, com clareza.</h1><p>Posições calculadas diretamente do histórico de compras e vendas.</p></div>
-        <button className="primary-button" type="button">+ Nova operação</button>
+        {data.portfolios.length > 1 && <label className="portfolio-selector">Carteira
+          <select value={data.selectedPortfolio?.id ?? ''} disabled={isSwitchingPortfolio} onChange={(event) => void selectPortfolio(event.target.value)}>
+            {data.portfolios.map((portfolio) => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}
+          </select>
+        </label>}
       </section>
+      {portfolioError && <div className="inline-error" role="alert">{portfolioError}</div>}
       <section className="summary-grid" aria-label="Resumo da carteira">
-        <article className="summary-card"><span>Carteira selecionada</span><strong>{data.selectedPortfolio?.name ?? '—'}</strong><small>Primeira carteira disponível</small></article>
+        <article className="summary-card"><span>Carteira selecionada</span><strong>{data.selectedPortfolio?.name ?? '—'}</strong><small>{isSwitchingPortfolio ? 'Atualizando posições…' : 'Dados reais da carteira'}</small></article>
         <article className="summary-card"><span>Posições abertas</span><strong>{data.positions.length}</strong><small>{data.selectedPortfolio?.name ?? 'Nenhuma carteira'}</small></article>
         <article className="summary-card"><span>Carteiras</span><strong>{data.totalPortfolios}</strong><small>Vinculadas à sua conta</small></article>
       </section>
