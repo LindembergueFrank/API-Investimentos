@@ -67,6 +67,39 @@ describe('App', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  it('loads every reported portfolio and asset page before rendering the dashboard', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/portfolios?page=0&size=100') return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'portfolio-1', name: 'Principal' }], totalElements: 101, totalPages: 2,
+      }), { status: 200 }))
+      if (url === '/v1/portfolios?page=1&size=100') return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'portfolio-101', name: 'Carteira 101' }], totalElements: 101, totalPages: 2,
+      }), { status: 200 }))
+      if (url === '/v1/assets?page=0&size=100') return Promise.resolve(new Response(JSON.stringify({
+        items: [], totalElements: 101, totalPages: 2,
+      }), { status: 200 }))
+      if (url === '/v1/assets?page=1&size=100') return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'asset-101', ticker: 'PAGE3', name: 'Ativo paginado', market: 'B3', type: 'STOCK' }], totalElements: 101, totalPages: 2,
+      }), { status: 200 }))
+      if (url.includes('/positions')) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByRole('option', { name: 'Carteira 101' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nova operação' }))
+    expect(screen.getByRole('option', { name: 'PAGE3 — Ativo paginado' })).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/v1/portfolios?page=1&size=100', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(fetchMock).toHaveBeenCalledWith('/v1/assets?page=1&size=100', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+  })
+
   it('creates the first portfolio with authentication and updates the empty dashboard', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString()
