@@ -2,7 +2,9 @@
 
 API REST em evolução para servir como base de um agregador de investimentos, desenvolvida com **Java 21, Spring Boot, JPA/Hibernate e MySQL**.
 
-O projeto começou pelo domínio de usuários e está sendo gradualmente elevado de exercício de backend para um repositório de portfólio com foco em segurança, testes, configuração por ambiente e práticas de engenharia de software.
+O escopo implementado é o gerenciamento de usuários. A agregação de investimentos é uma evolução planejada; ainda não existem carteira, ativos, cotações ou cálculo de rentabilidade nesta versão.
+
+A base utiliza Spring Boot 3.3.2 e é desenvolvida com foco em segurança, testes, configuração por ambiente e práticas de engenharia de software.
 
 ## Estado atual
 
@@ -82,6 +84,8 @@ Exporte as variáveis do `.env` para o processo da aplicação conforme o seu sh
 ```
 
 Por padrão, a aplicação espera MySQL em `localhost:3307` e banco `mydatabase`.
+
+No Windows, utilize `mvnw.cmd spring-boot:run` e `mvnw.cmd test`, configurando as variáveis no terminal ou na IDE.
 
 ## Testes
 
