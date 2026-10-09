@@ -26,7 +26,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (!session) return
     const refreshInMilliseconds = Math.max((session.expiresIn - 30) * 1000, 1_000)
     const timer = window.setTimeout(() => {
-      refresh(session.refreshToken).then(setSession).catch(() => setSession(null))
+      refresh(session.refreshToken)
+        .then((nextSession) => setSession((current) => current?.refreshToken === session.refreshToken ? nextSession : current))
+        .catch(() => setSession((current) => current?.refreshToken === session.refreshToken ? null : current))
     }, refreshInMilliseconds)
     return () => window.clearTimeout(timer)
   }, [session])
