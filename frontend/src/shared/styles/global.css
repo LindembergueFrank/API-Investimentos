@@ -52,6 +52,11 @@ main { padding: 48px 4.5vw 64px; }
 .portfolio-selector select:disabled { cursor: wait; opacity: .65; }
 .inline-error { margin: -18px 0 24px; padding: 11px 14px; border: 1px solid #f3c5c1; border-radius: 10px; color: #8f241d; background: #fff4f3; font-size: 12px; }
 .operation-panel { margin-bottom: 16px; }
+.compact-form-panel { max-width: 620px; margin: 0 0 16px auto; }
+.compact-form { display: grid; gap: 14px; margin-top: 20px; }
+.compact-form label { display: grid; gap: 7px; color: #39445a; font-size: 12px; font-weight: 700; }
+.compact-form input { width: 100%; padding: 11px 12px; border: 1px solid #dce2ec; border-radius: 10px; color: var(--navy); background: #fbfcfe; }
+.compact-form input:focus { outline: 3px solid rgb(37 99 235 / 10%); border-color: #7aa4f7; }
 .operation-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
 .operation-form label { display: grid; gap: 7px; color: #39445a; font-size: 12px; font-weight: 700; }
 .operation-form input, .operation-form select { width: 100%; padding: 11px 12px; border: 1px solid #dce2ec; border-radius: 10px; color: var(--navy); background: #fbfcfe; }
