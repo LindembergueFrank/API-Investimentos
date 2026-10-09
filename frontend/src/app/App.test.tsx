@@ -97,6 +97,49 @@ describe('App', () => {
     }))
   })
 
+  it('registers an authenticated and idempotent operation without converting decimals', async () => {
+    let createAttempts = 0
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/transactions' && init?.method === 'POST') {
+        createAttempts += 1
+        return Promise.resolve(createAttempts === 1
+          ? new Response(JSON.stringify({ detail: 'Falha temporária.' }), { status: 503 })
+          : new Response(JSON.stringify({ id: 'transaction-1' }), { status: 201 }))
+      }
+      if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({ items: [{ id: 'portfolio-1', name: 'Longo prazo' }], totalElements: 1 }), { status: 200 }))
+      if (url.startsWith('/v1/assets?')) return Promise.resolve(new Response(JSON.stringify({ items: [{ id: 'asset-1', ticker: 'ACME3', name: 'Acme S.A.', market: 'B3', type: 'STOCK' }], totalElements: 1 }), { status: 200 }))
+      if (url.includes('/positions')) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    fireEvent.click(await screen.findByRole('button', { name: '+ Nova operação' }))
+    fireEvent.change(screen.getByLabelText('Quantidade'), { target: { value: '1,12345678' } })
+    fireEvent.change(screen.getByLabelText('Preço unitário'), { target: { value: '25,99' } })
+    fireEvent.change(screen.getByLabelText('Taxas'), { target: { value: '0,10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falha temporária.')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
+    await waitFor(() => expect(createAttempts).toBe(2))
+    expect(fetchMock).toHaveBeenCalledWith('/v1/transactions', expect.objectContaining({
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer access-token' },
+    }))
+    const transactionCalls = fetchMock.mock.calls.filter(([url]) => url === '/v1/transactions')
+    const body = JSON.parse(transactionCalls[0][1]?.body as string)
+    const retryBody = JSON.parse(transactionCalls[1][1]?.body as string)
+    expect(body).toMatchObject({ portfolioId: 'portfolio-1', assetId: 'asset-1', type: 'BUY', quantity: '1.12345678', unitPrice: '25.99', fees: '0.10' })
+    expect(body.requestId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(retryBody.requestId).toBe(body.requestId)
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Registrar compra ou venda' })).not.toBeInTheDocument())
+  })
+
   it('keeps the current portfolio visible when switching fails', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
