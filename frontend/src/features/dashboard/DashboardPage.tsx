@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { OperationForm } from '../transactions/OperationForm'
 import { loadDashboard, loadPortfolioDetails, type Asset, type Portfolio, type Position, type Transaction } from './dashboardApi'
 
 type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; assets: Map<string, Asset> }
@@ -13,6 +14,7 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [portfolioError, setPortfolioError] = useState<string | null>(null)
   const [isSwitchingPortfolio, setIsSwitchingPortfolio] = useState(false)
+  const [showOperationForm, setShowOperationForm] = useState(false)
   const portfolioRequest = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -53,6 +55,13 @@ export function DashboardPage() {
     }
   }
 
+  async function refreshSelectedPortfolio() {
+    if (!session || !data?.selectedPortfolio) return
+    const details = await loadPortfolioDetails(data.selectedPortfolio.id, session.accessToken)
+    setData((current) => current ? { ...current, ...details } : current)
+    setShowOperationForm(false)
+  }
+
   if (error) return <div className="dashboard"><section className="panel status-panel" role="alert"><h1>Não foi possível carregar o painel</h1><p>{error}</p></section></div>
   if (!data) return <div className="dashboard"><section className="panel status-panel" aria-live="polite"><h1>Carregando seu painel…</h1><p>Consultando carteiras e posições com segurança.</p></section></div>
 
@@ -60,13 +69,14 @@ export function DashboardPage() {
     <div className="dashboard">
       <section className="hero-row">
         <div><span className="eyebrow">VISÃO GERAL</span><h1>Seu patrimônio, com clareza.</h1><p>Posições calculadas diretamente do histórico de compras e vendas.</p></div>
-        {data.portfolios.length > 1 && <label className="portfolio-selector">Carteira
+        <div className="hero-actions">{data.selectedPortfolio && data.assets.size > 0 && <button className="primary-button" type="button" onClick={() => setShowOperationForm(true)}>+ Nova operação</button>}{data.portfolios.length > 1 && <label className="portfolio-selector">Carteira
           <select value={data.selectedPortfolio?.id ?? ''} disabled={isSwitchingPortfolio} onChange={(event) => void selectPortfolio(event.target.value)}>
             {data.portfolios.map((portfolio) => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}
           </select>
-        </label>}
+        </label>}</div>
       </section>
       {portfolioError && <div className="inline-error" role="alert">{portfolioError}</div>}
+      {showOperationForm && session && data.selectedPortfolio && <OperationForm accessToken={session.accessToken} portfolio={data.selectedPortfolio} assets={[...data.assets.values()]} onCancel={() => setShowOperationForm(false)} onCreated={refreshSelectedPortfolio} />}
       <section className="summary-grid" aria-label="Resumo da carteira">
         <article className="summary-card"><span>Carteira selecionada</span><strong>{data.selectedPortfolio?.name ?? '—'}</strong><small>{isSwitchingPortfolio ? 'Atualizando posições…' : 'Dados reais da carteira'}</small></article>
         <article className="summary-card"><span>Posições abertas</span><strong>{data.positions.length}</strong><small>{data.selectedPortfolio?.name ?? 'Nenhuma carteira'}</small></article>
