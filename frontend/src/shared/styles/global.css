@@ -71,6 +71,13 @@ main { padding: 48px 4.5vw 64px; }
 .position-row > div { display: grid; gap: 4px; }
 .position-row span, .position-row small { color: var(--muted); font-size: 11px; }
 .position-row strong { font-size: 13px; }
+.activity-list { display: grid; gap: 0; padding: 0; margin: 0; list-style: none; }
+.activity-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.activity-list div { display: grid; gap: 3px; }
+.activity-list small, .activity-list time { color: var(--muted); font-size: 10px; }
+.transaction-kind { padding: 4px 7px; border-radius: 999px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.transaction-kind.buy { color: #176b42; background: #e9f8ef; }
+.transaction-kind.sell { color: #9f2d26; background: #fff0ef; }
 .login-page { min-height: 100vh; padding: 32px; display: grid; place-items: center; background: radial-gradient(circle at top left, #e7efff, #f7f9fc 45%); }
 .login-card { width: min(100%, 430px); padding: 38px; border: 1px solid var(--line); border-radius: 20px; background: var(--white); box-shadow: 0 24px 70px rgb(38 56 94 / 12%); }
 .login-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 42px; color: var(--navy); }
