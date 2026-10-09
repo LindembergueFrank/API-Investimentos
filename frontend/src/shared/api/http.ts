@@ -6,6 +6,20 @@ export type ProblemDetail = {
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
+async function readProblem(response: Response, fallback: string) {
+  const problem = await response.json().catch(() => null) as ProblemDetail | null
+  return problem?.detail || problem?.title || fallback
+}
+
+export async function getJson<T>(path: string, accessToken: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal,
+  })
+  if (!response.ok) throw new Error(await readProblem(response, 'Não foi possível carregar os dados.'))
+  return response.json() as Promise<T>
+}
+
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method: 'POST',
@@ -15,8 +29,7 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
 
   if (!response.ok) {
     const fallback = 'Não foi possível concluir a solicitação.'
-    const problem = await response.json().catch(() => null) as ProblemDetail | null
-    throw new Error(problem?.detail || problem?.title || fallback)
+    throw new Error(await readProblem(response, fallback))
   }
 
   return response.json() as Promise<T>
