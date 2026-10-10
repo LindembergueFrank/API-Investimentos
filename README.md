@@ -22,6 +22,7 @@ A API implementa identidade segura e o primeiro recorte do domínio de carteiras
 | `GET` | `/v1/portfolios/{id}` | consulta uma carteira do próprio usuário |
 | `POST` | `/v1/assets` | cadastra ativo no catálogo (somente `ADMIN`) |
 | `GET` | `/v1/assets?page=0&size=20` | lista o catálogo para usuários autenticados |
+| `POST` | `/v1/transactions` | registra compra ou venda na carteira do usuário |
 
 ## Documentação da API
 
@@ -49,6 +50,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - consultas de carteira filtram simultaneamente pelo identificador do recurso e pelo proprietário, impedindo acesso horizontal;
 - a listagem de carteiras é paginada, ordenada de forma estável e limitada a 100 itens por página;
 - ativos são normalizados e únicos por mercado + ticker; apenas administradores alteram o catálogo compartilhado;
+- operações usam precisão decimal, chave idempotente por carteira e bloqueio pessimista para impedir vendas concorrentes acima da posição;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
