@@ -1,6 +1,7 @@
 package api_tech.api_investimentos.common.api;
 
 import api_tech.api_investimentos.identity.application.InvalidCredentialsException;
+import api_tech.api_investimentos.identity.application.InvalidRefreshTokenException;
 import api_tech.api_investimentos.identity.application.UserNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -104,6 +105,22 @@ public class ApiExceptionHandler {
                 HttpStatus.UNAUTHORIZED,
                 problemType("invalid-credentials"),
                 "Invalid credentials",
+                exception.getMessage(),
+                request
+        );
+
+        return response(problem);
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidRefreshToken(
+            InvalidRefreshTokenException exception,
+            WebRequest request
+    ) {
+        var problem = problem(
+                HttpStatus.UNAUTHORIZED,
+                problemType("invalid-refresh-token"),
+                "Invalid refresh token",
                 exception.getMessage(),
                 request
         );
