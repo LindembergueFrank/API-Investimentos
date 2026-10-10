@@ -57,6 +57,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - posições são derivadas na ordem monotônica do livro; taxas de compra compõem o custo e vendas não alteram o preço médio remanescente;
 - o contrato de posições documenta explicitamente schemas de sucesso, autenticação e recurso não encontrado no OpenAPI;
 - CORS permanece fechado por padrão e aceita somente origens HTTP(S) exatas configuradas em `API_CORS_ALLOWED_ORIGINS`;
+- o frontend React/TypeScript inicia com shell responsivo, estado vazio honesto e módulos organizados por funcionalidade;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
@@ -204,6 +205,14 @@ src/main/java/api_tech/api_investimentos/
 ├── portfolio/                # mesmas fronteiras para carteiras do usuário
 ├── asset/                    # catálogo controlado de ativos
 └── transaction/              # compras, vendas e consulta paginada de operações
+```
+
+O frontend fica em `frontend/`, separado por funcionalidades (`app`, `dashboard` e `shared`). Para executá-lo:
+
+```bash
+cd frontend
+npm ci
+npm run dev
 ```
 
 Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infraestrutura no mesmo módulo. DTOs HTTP são convertidos em comandos antes de entrar na aplicação, e o serviço depende da porta `UserRepository`, não do Spring Data diretamente.
