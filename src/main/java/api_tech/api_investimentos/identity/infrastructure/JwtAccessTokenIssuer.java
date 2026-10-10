@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.List;
 
 @Component
 public class JwtAccessTokenIssuer implements AccessTokenIssuer {
@@ -35,6 +36,7 @@ public class JwtAccessTokenIssuer implements AccessTokenIssuer {
                 .expiresAt(expiresAt)
                 .subject(user.getId().toString())
                 .claim("email", user.getEmail())
+                .claim("roles", List.of(user.getRole().name()))
                 .build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
 
