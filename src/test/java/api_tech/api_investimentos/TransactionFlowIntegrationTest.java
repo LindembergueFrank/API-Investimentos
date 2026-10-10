@@ -135,6 +135,47 @@ class TransactionFlowIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void shouldDeriveOnlyOwnedPortfolioPositionsAndOmitZeroedAssets() throws Exception {
+        String owner = registerAndLogin("position-owner");
+        String stranger = registerAndLogin("position-stranger");
+        UUID portfolioId = createPortfolio(owner);
+        UUID firstAssetId = createAsset();
+        UUID zeroedAssetId = createAsset();
+        Instant occurredAt = Instant.now().minus(1, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MICROS);
+
+        perform(owner, new CreateTransactionRequest(UUID.randomUUID(), portfolioId, firstAssetId,
+                TransactionType.BUY, new BigDecimal("10"), new BigDecimal("20"), new BigDecimal("2"), occurredAt))
+                .andExpect(status().isCreated());
+        perform(owner, new CreateTransactionRequest(UUID.randomUUID(), portfolioId, firstAssetId,
+                TransactionType.BUY, new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("3"), occurredAt))
+                .andExpect(status().isCreated());
+        perform(owner, new CreateTransactionRequest(UUID.randomUUID(), portfolioId, firstAssetId,
+                TransactionType.SELL, new BigDecimal("3"), new BigDecimal("40"), new BigDecimal("5"), occurredAt))
+                .andExpect(status().isCreated());
+        perform(owner, new CreateTransactionRequest(UUID.randomUUID(), portfolioId, zeroedAssetId,
+                TransactionType.BUY, new BigDecimal("1"), new BigDecimal("10"), BigDecimal.ZERO, occurredAt))
+                .andExpect(status().isCreated());
+        perform(owner, new CreateTransactionRequest(UUID.randomUUID(), portfolioId, zeroedAssetId,
+                TransactionType.SELL, new BigDecimal("1"), new BigDecimal("11"), BigDecimal.ZERO, occurredAt))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/v1/portfolios/{portfolioId}/positions", portfolioId)
+                        .header("Authorization", bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].assetId").value(firstAssetId.toString()))
+                .andExpect(jsonPath("$[0].quantity").value(12.00000000))
+                .andExpect(jsonPath("$[0].averagePrice").value(23.66666667))
+                .andExpect(jsonPath("$[0].totalCost").value(284.00000004));
+
+        mockMvc.perform(get("/v1/portfolios/{portfolioId}/positions", portfolioId)
+                        .header("Authorization", bearer(stranger)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/v1/portfolios/{portfolioId}/positions", portfolioId))
+                .andExpect(status().isUnauthorized());
+    }
+
     private int submitAfter(CountDownLatch gate, String token, CreateTransactionRequest request) throws Exception {
         gate.await();
         return mockMvc.perform(post("/v1/transactions").header("Authorization", bearer(token))

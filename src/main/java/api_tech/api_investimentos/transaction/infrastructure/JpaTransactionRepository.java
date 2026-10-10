@@ -8,6 +8,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,5 +32,12 @@ public class JpaTransactionRepository implements TransactionRepository {
         return new TransactionPage(result.getContent(), result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());
     }
+
+    @Override
+    public List<InvestmentTransaction> findAllByPortfolioIdInLedgerOrder(UUID portfolioId) {
+        var sort = Sort.by("ledgerOrder").ascending();
+        return repository.findAllByPortfolioId(portfolioId, sort);
+    }
+
     @Override public BigDecimal netQuantity(UUID portfolioId, UUID assetId) { return repository.netQuantity(portfolioId, assetId); }
 }
