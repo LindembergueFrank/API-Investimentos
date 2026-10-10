@@ -1,4 +1,4 @@
-package api_tech.api_investimentos.controller;
+package api_tech.api_investimentos.identity.api;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

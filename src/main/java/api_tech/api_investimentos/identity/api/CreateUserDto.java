@@ -1,4 +1,4 @@
-package api_tech.api_investimentos.controller;
+package api_tech.api_investimentos.identity.api;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;

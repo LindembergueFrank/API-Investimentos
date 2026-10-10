@@ -1,6 +1,6 @@
 package api_tech.api_investimentos.common.api;
 
-import api_tech.api_investimentos.service.UserNotFoundException;
+import api_tech.api_investimentos.identity.application.UserNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
