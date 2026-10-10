@@ -83,4 +83,51 @@ describe('AuthProvider session lifecycle', () => {
     expect(screen.getByText('signed-out')).toBeInTheDocument()
     expect(screen.queryByText('stale-access')).not.toBeInTheDocument()
   })
+
+  it('clears the session when refresh is rejected', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31, refreshToken: 'refresh-1' }))
+      .mockResolvedValueOnce(response({ detail: 'Sessão expirada.' }, 401))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<AuthProvider><Harness /></AuthProvider>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'login' }))
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByText('access-1')).toBeInTheDocument()
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+
+    expect(screen.getByText('signed-out')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenLastCalledWith('/v1/auth/refresh', expect.objectContaining({
+      body: JSON.stringify({ refreshToken: 'refresh-1' }),
+    }))
+  })
+
+  it('does not overwrite a newer login when an older refresh finishes later', async () => {
+    vi.useFakeTimers()
+    let finishRefresh!: () => void
+    const pendingRefresh = new Promise<Response>((resolve) => {
+      finishRefresh = () => resolve(response({ accessToken: 'stale-access', expiresIn: 900, refreshToken: 'stale-refresh' }))
+    })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31, refreshToken: 'refresh-1' }))
+      .mockReturnValueOnce(pendingRefresh)
+      .mockResolvedValueOnce(response({ accessToken: 'access-2', expiresIn: 900, refreshToken: 'refresh-2' }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<AuthProvider><Harness /></AuthProvider>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'login' }))
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+    fireEvent.click(screen.getByRole('button', { name: 'login' }))
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByText('access-2')).toBeInTheDocument()
+
+    finishRefresh()
+    await act(async () => { await Promise.resolve() })
+
+    expect(screen.getByText('access-2')).toBeInTheDocument()
+    expect(screen.queryByText('stale-access')).not.toBeInTheDocument()
+  })
 })
