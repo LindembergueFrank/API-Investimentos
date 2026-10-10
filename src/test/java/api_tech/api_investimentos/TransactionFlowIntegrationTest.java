@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -90,6 +91,48 @@ class TransactionFlowIntegrationTest {
             assertEquals(List.of(201, 409), statuses);
         }
         assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM investment_transaction WHERE portfolio_id = ?", Integer.class, portfolioId));
+    }
+
+    @Test
+    void shouldListOnlyOwnedPortfolioTransactionsWithStablePagination() throws Exception {
+        String owner = registerAndLogin("timeline-owner");
+        String stranger = registerAndLogin("timeline-stranger");
+        UUID portfolioId = createPortfolio(owner);
+        UUID assetId = createAsset();
+        Instant base = Instant.now().minus(10, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MICROS);
+
+        perform(owner, request(UUID.randomUUID(), portfolioId, assetId, TransactionType.BUY, "1", base))
+                .andExpect(status().isCreated());
+        perform(owner, request(UUID.randomUUID(), portfolioId, assetId, TransactionType.BUY, "2", base.plusSeconds(60)))
+                .andExpect(status().isCreated());
+        perform(owner, request(UUID.randomUUID(), portfolioId, assetId, TransactionType.BUY, "3", base.plusSeconds(120)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/v1/portfolios/{portfolioId}/transactions", portfolioId)
+                        .header("Authorization", bearer(owner)).param("page", "0").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].quantity").value(3))
+                .andExpect(jsonPath("$.content[1].quantity").value(2))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        mockMvc.perform(get("/v1/portfolios/{portfolioId}/transactions", portfolioId)
+                        .header("Authorization", bearer(owner)).param("page", "1").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].quantity").value(1));
+
+        mockMvc.perform(get("/v1/portfolios/{portfolioId}/transactions", portfolioId)
+                        .header("Authorization", bearer(stranger)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/v1/portfolios/{portfolioId}/transactions", portfolioId)
+                        .header("Authorization", bearer(owner)).param("size", "101"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/portfolios/{portfolioId}/transactions", portfolioId))
+                .andExpect(status().isUnauthorized());
     }
 
     private int submitAfter(CountDownLatch gate, String token, CreateTransactionRequest request) throws Exception {

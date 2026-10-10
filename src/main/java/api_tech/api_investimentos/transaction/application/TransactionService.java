@@ -3,6 +3,7 @@ package api_tech.api_investimentos.transaction.application;
 import api_tech.api_investimentos.asset.application.AssetRepository;
 import api_tech.api_investimentos.portfolio.application.PortfolioNotFoundException;
 import api_tech.api_investimentos.portfolio.application.PortfolioRepository;
+import api_tech.api_investimentos.portfolio.application.InvalidPaginationException;
 import api_tech.api_investimentos.transaction.domain.InvestmentTransaction;
 import api_tech.api_investimentos.transaction.domain.TransactionType;
 import org.springframework.stereotype.Service;
@@ -42,5 +43,15 @@ public class TransactionService {
         var transaction = new InvestmentTransaction(UUID.randomUUID(), command.requestId(), command.portfolioId(),
                 command.assetId(), command.type(), command.quantity(), command.unitPrice(), command.fees(), command.occurredAt());
         return new CreateTransactionResult(transactions.save(transaction), true);
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionPage listByPortfolio(UUID portfolioId, UUID ownerId, int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new InvalidPaginationException();
+        }
+        portfolios.findByIdAndOwnerId(portfolioId, ownerId)
+                .orElseThrow(() -> new PortfolioNotFoundException(portfolioId));
+        return transactions.findPageByPortfolioId(portfolioId, page, size);
     }
 }

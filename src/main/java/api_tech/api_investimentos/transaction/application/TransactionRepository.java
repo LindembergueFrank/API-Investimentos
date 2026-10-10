@@ -8,5 +8,7 @@ import java.util.UUID;
 public interface TransactionRepository {
     InvestmentTransaction save(InvestmentTransaction transaction);
     Optional<InvestmentTransaction> findByPortfolioIdAndRequestId(UUID portfolioId, UUID requestId);
+
+    TransactionPage findPageByPortfolioId(UUID portfolioId, int page, int size);
     BigDecimal netQuantity(UUID portfolioId, UUID assetId);
 }
