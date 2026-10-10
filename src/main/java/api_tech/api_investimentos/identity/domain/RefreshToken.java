@@ -14,7 +14,8 @@ import java.util.UUID;
         name = "tb_refresh_token",
         indexes = {
                 @Index(name = "ix_refresh_token_user", columnList = "user_id"),
-                @Index(name = "ix_refresh_token_family", columnList = "family_id")
+                @Index(name = "ix_refresh_token_family", columnList = "family_id"),
+                @Index(name = "ix_refresh_token_family_expiry", columnList = "family_id, expires_at")
         }
 )
 public class RefreshToken {

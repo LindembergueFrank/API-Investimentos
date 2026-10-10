@@ -31,7 +31,12 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 @Configuration
-@EnableConfigurationProperties({JwtProperties.class, RefreshTokenProperties.class, AuthRateLimitProperties.class})
+@EnableConfigurationProperties({
+        JwtProperties.class,
+        RefreshTokenProperties.class,
+        RefreshTokenCleanupProperties.class,
+        AuthRateLimitProperties.class
+})
 public class SecurityConfig {
 
     @Bean
