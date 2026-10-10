@@ -23,6 +23,7 @@ A API implementa identidade segura e o primeiro recorte do domínio de carteiras
 | `POST` | `/v1/assets` | cadastra ativo no catálogo (somente `ADMIN`) |
 | `GET` | `/v1/assets?page=0&size=20` | lista o catálogo para usuários autenticados |
 | `POST` | `/v1/transactions` | registra compra ou venda na carteira do usuário |
+| `GET` | `/v1/portfolios/{id}/transactions?page=0&size=20` | lista as operações da própria carteira |
 
 ## Documentação da API
 
@@ -51,6 +52,7 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - a listagem de carteiras é paginada, ordenada de forma estável e limitada a 100 itens por página;
 - ativos são normalizados e únicos por mercado + ticker; apenas administradores alteram o catálogo compartilhado;
 - operações usam precisão decimal, chave idempotente por carteira e bloqueio pessimista para impedir vendas concorrentes acima da posição;
+- a linha do tempo de operações é paginada, limitada a 100 itens e ordenada de forma determinística;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
@@ -196,7 +198,8 @@ src/main/java/api_tech/api_investimentos/
     ├── domain/               # modelo de identidade
     └── infrastructure/       # adaptadores de persistência
 ├── portfolio/                # mesmas fronteiras para carteiras do usuário
-└── asset/                    # catálogo controlado de ativos
+├── asset/                    # catálogo controlado de ativos
+└── transaction/              # compras, vendas e consulta paginada de operações
 ```
 
 Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infraestrutura no mesmo módulo. DTOs HTTP são convertidos em comandos antes de entrar na aplicação, e o serviço depende da porta `UserRepository`, não do Spring Data diretamente.
@@ -205,9 +208,9 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. operações de compra e venda;
-2. posição e preço médio;
-3. associação entre carteira e ativos;
+1. posição e preço médio derivados das operações;
+2. rentabilidade e integração com cotações;
+3. frontend integrado ao contrato OpenAPI;
 4. verificação de e-mail, recuperação de senha e observabilidade.
 
 ## Princípios de contribuição
