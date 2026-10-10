@@ -96,9 +96,22 @@ Por padrão, a aplicação espera MySQL em `localhost:3307` e banco `mydatabase`
 
 No Windows, utilize `mvnw.cmd spring-boot:run` e `mvnw.cmd test`, configurando as variáveis no terminal ou na IDE.
 
+## Migrações de banco
+
+O Flyway é responsável pela evolução do schema. Na inicialização, migrations pendentes em `src/main/resources/db/migration` são aplicadas antes de o Hibernate validar o mapeamento JPA. O Hibernate usa `ddl-auto=validate` e não cria nem altera tabelas.
+
+Para um banco local descartável criado antes da adoção do Flyway, recrie o volume:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+Esse comando remove os dados locais. Para preservar um banco existente, faça backup, confira se o schema corresponde à migration `V1` e execute a aplicação uma única vez com `FLYWAY_BASELINE_ON_MIGRATE=true`. Depois remova essa variável para que divergências futuras voltem a interromper a inicialização.
+
 ## Testes
 
-A suíte unitária e o teste de contexto usam H2 em memória:
+A suíte unitária e os testes de integração usam H2 em memória. O teste de contexto executa a migration inicial e valida o schema com Hibernate:
 
 ```bash
 ./mvnw test
@@ -121,11 +134,10 @@ src/main/java/api_tech/api_investimentos/
 
 Próximas evoluções priorizadas:
 
-1. migrations com Flyway;
-2. organização por funcionalidade;
-3. autenticação e autorização com Spring Security;
-4. modelagem do domínio de investimentos;
-5. observabilidade e configuração de produção.
+1. organização por funcionalidade;
+2. autenticação e autorização com Spring Security;
+3. modelagem do domínio de investimentos;
+4. observabilidade e configuração de produção.
 
 ## Princípios de contribuição
 
