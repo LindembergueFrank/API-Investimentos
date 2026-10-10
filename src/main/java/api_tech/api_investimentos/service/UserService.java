@@ -37,17 +37,16 @@ public class UserService {
         return userSaved.getId();
     }
 
-    public Optional<User> getUserById(String id) {
-        return userRepository.findById(UUID.fromString(id));
+    public Optional<User> getUserById(UUID id) {
+        return userRepository.findById(id);
     }
 
     public List<User> listUsers() {
         return userRepository.findAll();
     }
 
-    public void updateUserById(String id, UpdateUserDto updateUserDto) {
-        var userId = UUID.fromString(id);
-        var userExists = userRepository.findById(userId);
+    public void updateUserById(UUID id, UpdateUserDto updateUserDto) {
+        var userExists = userRepository.findById(id);
 
         if (userExists.isEmpty()) {
             return;
@@ -66,11 +65,9 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public void deleteById(String id) {
-        var userId = UUID.fromString(id);
-
-        if (userRepository.existsById(userId)) {
-            userRepository.deleteById(userId);
+    public void deleteById(UUID id) {
+        if (userRepository.existsById(id)) {
+            userRepository.deleteById(id);
         }
     }
 }
