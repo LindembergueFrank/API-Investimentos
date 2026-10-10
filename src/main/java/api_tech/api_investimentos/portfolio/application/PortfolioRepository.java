@@ -10,6 +10,7 @@ public interface PortfolioRepository {
     <S extends Portfolio> S save(S portfolio);
 
     Optional<Portfolio> findByIdAndOwnerId(UUID id, UUID ownerId);
+    Optional<Portfolio> lockByIdAndOwnerId(UUID id, UUID ownerId);
 
     PortfolioPage findPageByOwnerId(UUID ownerId, int page, int size);
 }
