@@ -1,5 +1,7 @@
 package api_tech.api_investimentos.config;
 
+import api_tech.api_investimentos.identity.infrastructure.AuthRateLimitFilter;
+import api_tech.api_investimentos.identity.infrastructure.AuthRequestRateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +21,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.io.IOException;
@@ -28,11 +31,15 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 @Configuration
-@EnableConfigurationProperties({JwtProperties.class, RefreshTokenProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, RefreshTokenProperties.class, AuthRateLimitProperties.class})
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            ObjectMapper objectMapper,
+            AuthRequestRateLimiter authRequestRateLimiter
+    ) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -74,7 +81,11 @@ public class SecurityConfig {
                                 "Invalid access token",
                                 "The bearer token is missing, invalid or expired.",
                                 request.getRequestURI()
-                        )));
+                        )))
+                .addFilterBefore(
+                        new AuthRateLimitFilter(authRequestRateLimiter, objectMapper),
+                        BearerTokenAuthenticationFilter.class
+                );
 
         return http.build();
     }
