@@ -1,4 +1,4 @@
-package api_tech.api_investimentos.entity;
+package api_tech.api_investimentos.identity.domain;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;

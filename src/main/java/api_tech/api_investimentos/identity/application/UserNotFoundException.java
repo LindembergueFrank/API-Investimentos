@@ -1,4 +1,4 @@
-package api_tech.api_investimentos.service;
+package api_tech.api_investimentos.identity.application;
 
 import java.util.UUID;
 

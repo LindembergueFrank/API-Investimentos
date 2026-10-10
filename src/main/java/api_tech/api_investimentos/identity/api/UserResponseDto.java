@@ -1,6 +1,6 @@
-package api_tech.api_investimentos.controller;
+package api_tech.api_investimentos.identity.api;
 
-import api_tech.api_investimentos.entity.User;
+import api_tech.api_investimentos.identity.domain.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
