@@ -37,7 +37,9 @@ Os endpoints documentam payloads, validações, códigos de resposta e erros no 
 - os endpoints de autenticação possuem limite configurável por endereço de origem;
 - a API é stateless e exige token nos endpoints protegidos;
 - o identificador do proprietário vem do `sub` assinado do JWT; um usuário não pode consultar, alterar ou excluir outro cadastro;
-- a listagem de usuários exige o papel `ADMIN` e permanece inacessível enquanto perfis administrativos não forem emitidos nos tokens;
+- os papéis `USER`, `PROFESSIONAL` e `ADMIN` seguem privilégio mínimo; todo cadastro público recebe exclusivamente `USER`;
+- o papel é carregado do banco no login e incluído no token como autoridade; somente `ADMIN` pode listar usuários;
+- não existe endpoint público para promover papéis: a atribuição de `PROFESSIONAL` ou `ADMIN` deve ocorrer por processo administrativo controlado;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
