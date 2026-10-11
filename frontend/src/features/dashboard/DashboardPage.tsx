@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { loadDashboard, type Portfolio, type Position } from './dashboardApi'
+import { loadDashboard, type Asset, type Portfolio, type Position, type Transaction } from './dashboardApi'
 
-type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[] }
+type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; assets: Map<string, Asset> }
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const decimal = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 8 })
+const date = new Intl.DateTimeFormat('pt-BR')
 
 export function DashboardPage() {
   const { session } = useAuth()
@@ -16,8 +17,9 @@ export function DashboardPage() {
     const controller = new AbortController()
     setError(null)
     loadDashboard(session.accessToken, controller.signal)
-      .then(({ portfolios, positions, selectedPortfolio }) => setData({
-        portfolios: portfolios.items, totalPortfolios: portfolios.totalElements, selectedPortfolio, positions,
+      .then(({ portfolios, positions, transactions, assets, selectedPortfolio }) => setData({
+        portfolios: portfolios.items, totalPortfolios: portfolios.totalElements, selectedPortfolio, positions, transactions,
+        assets: new Map(assets.items.map((asset) => [asset.id, asset])),
       }))
       .catch((cause: unknown) => {
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o painel.')
@@ -50,14 +52,24 @@ export function DashboardPage() {
           ) : (
             <div className="position-list" aria-label="Posições abertas">
               {data.positions.map((position) => <article className="position-row" key={position.assetId}>
-                <div><strong>Ativo {position.assetId.slice(0, 8)}</strong><small>{decimal.format(position.quantity)} unidades</small></div>
+                <div><strong>{data.assets.get(position.assetId)?.ticker ?? `Ativo ${position.assetId.slice(0, 8)}`}</strong><small>{data.assets.get(position.assetId)?.name ? `${data.assets.get(position.assetId)?.name} · ` : ''}{decimal.format(position.quantity)} unidades</small></div>
                 <div><span>Preço médio</span><strong>{money.format(position.averagePrice)}</strong></div>
                 <div><span>Custo</span><strong>{money.format(position.totalCost)}</strong></div>
               </article>)}
             </div>
           )}
         </article>
-        <aside className="panel activity-panel"><div className="panel-heading"><div><span className="eyebrow">DADOS REAIS</span><h2>Limites atuais</h2></div></div><div className="activity-line" /><p className="muted">Rentabilidade e valor de mercado aparecerão somente após a integração de cotações. O painel mostra agora o custo contábil confirmado pela API.</p></aside>
+        <aside className="panel activity-panel">
+          <div className="panel-heading"><div><span className="eyebrow">HISTÓRICO</span><h2>Atividade recente</h2></div></div>
+          <div className="activity-line" />
+          {data.transactions.length === 0 ? <p className="muted">Nenhuma operação registrada nesta carteira.</p> : <ol className="activity-list">
+            {data.transactions.map((transaction) => <li key={transaction.id}>
+              <span className={`transaction-kind ${transaction.type.toLowerCase()}`}>{transaction.type === 'BUY' ? 'Compra' : 'Venda'}</span>
+              <div><strong>{data.assets.get(transaction.assetId)?.ticker ?? `Ativo ${transaction.assetId.slice(0, 8)}`}</strong><small>{decimal.format(transaction.quantity)} unidades · {money.format(transaction.unitPrice)}</small></div>
+              <time dateTime={transaction.occurredAt}>{date.format(new Date(transaction.occurredAt))}</time>
+            </li>)}
+          </ol>}
+        </aside>
       </section>
     </div>
   )
