@@ -215,6 +215,8 @@ npm ci
 npm run dev
 ```
 
+Por segurança, tokens de acesso e renovação ficam somente em memória: recarregar ou fechar a aba encerra a sessão local. A URL da API pode ser definida por `VITE_API_BASE_URL`; sem ela, o frontend usa a mesma origem.
+
 Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infraestrutura no mesmo módulo. DTOs HTTP são convertidos em comandos antes de entrar na aplicação, e o serviço depende da porta `UserRepository`, não do Spring Data diretamente.
 
 ## Roadmap de engenharia
