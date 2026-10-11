@@ -4,6 +4,7 @@ import { authenticate, refresh, revoke, type Session } from './authApi'
 
 type AuthContextValue = {
   session: Session | null
+  isRestoring: boolean
   login(email: string, password: string): Promise<void>
   logout(): Promise<void>
   getJson<T>(path: string, signal?: AbortSignal): Promise<T>
@@ -11,12 +12,18 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-export function AuthProvider({ children }: PropsWithChildren) {
+type AuthProviderProps = PropsWithChildren<{ restoreSession?: boolean }>
+
+export function AuthProvider({ children, restoreSession = true }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null)
+  const [isRestoring, setIsRestoring] = useState(restoreSession)
   const sessionRef = useRef<Session | null>(null)
   const refreshFlight = useRef<Promise<string | null> | null>(null)
+  const restoreFlight = useRef<Promise<Session> | null>(null)
+  const sessionVersion = useRef(0)
 
   const replaceSession = useCallback((nextSession: Session | null) => {
+    sessionVersion.current += 1
     sessionRef.current = nextSession
     setSession(nextSession)
   }, [])
@@ -26,9 +33,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [replaceSession])
 
   const logout = useCallback(async () => {
-    const token = sessionRef.current?.refreshToken
     replaceSession(null)
-    if (token) await revoke(token).catch(() => undefined)
+    await revoke().catch(() => undefined)
   }, [replaceSession])
 
   const renewAccessToken = useCallback((rejectedAccessToken: string) => {
@@ -37,15 +43,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (current.accessToken !== rejectedAccessToken) return Promise.resolve(current.accessToken)
     if (refreshFlight.current) return refreshFlight.current
 
-    const expectedRefreshToken = current.refreshToken
-    const flight = refresh(expectedRefreshToken)
+    const expectedVersion = sessionVersion.current
+    const flight = refresh()
       .then((nextSession) => {
-        if (sessionRef.current?.refreshToken !== expectedRefreshToken) return sessionRef.current?.accessToken ?? null
+        if (sessionVersion.current !== expectedVersion) return sessionRef.current?.accessToken ?? null
         replaceSession(nextSession)
         return nextSession.accessToken
       })
       .catch(() => {
-        if (sessionRef.current?.refreshToken === expectedRefreshToken) replaceSession(null)
+        if (sessionVersion.current === expectedVersion) replaceSession(null)
         return null
       })
       .finally(() => {
@@ -54,6 +60,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
     refreshFlight.current = flight
     return flight
   }, [replaceSession])
+
+  useEffect(() => {
+    if (!restoreSession) return
+    const expectedVersion = sessionVersion.current
+    let active = true
+    if (!restoreFlight.current) restoreFlight.current = refresh()
+    restoreFlight.current
+      .then((restoredSession) => {
+        if (active && sessionVersion.current === expectedVersion) replaceSession(restoredSession)
+      })
+      .catch(() => undefined)
+      .finally(() => { if (active) setIsRestoring(false) })
+    return () => { active = false }
+  }, [replaceSession, restoreSession])
 
   const authenticatedGet = useCallback(<T,>(path: string, signal?: AbortSignal) => {
     const current = sessionRef.current
@@ -68,7 +88,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => window.clearTimeout(timer)
   }, [session, renewAccessToken])
 
-  const value = useMemo(() => ({ session, login, logout, getJson: authenticatedGet }), [session, login, logout, authenticatedGet])
+  const value = useMemo(() => ({ session, isRestoring, login, logout, getJson: authenticatedGet }), [session, isRestoring, login, logout, authenticatedGet])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

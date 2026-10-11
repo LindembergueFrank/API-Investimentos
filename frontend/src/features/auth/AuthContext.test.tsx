@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useState } from 'react'
+import { StrictMode, useState } from 'react'
 import { postAuthenticatedJson } from '../../shared/api/http'
 import { AuthProvider, useAuth } from './AuthContext'
 
@@ -45,13 +45,35 @@ describe('AuthProvider session lifecycle', () => {
     vi.unstubAllGlobals()
   })
 
+  it('restores a durable session from the protected cookie on startup', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ accessToken: 'restored-access', expiresIn: 900 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<AuthProvider><Harness /></AuthProvider>)
+
+    expect(await screen.findByText('restored-access')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/v1/auth/browser/refresh', expect.objectContaining({
+      method: 'POST', credentials: 'include', body: undefined,
+    }))
+  })
+
+  it('uses a single restore request when React StrictMode replays effects', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ accessToken: 'restored-access', expiresIn: 900 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<StrictMode><AuthProvider><Harness /></AuthProvider></StrictMode>)
+
+    expect(await screen.findByText('restored-access')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('rotates the in-memory session before the access token expires', async () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31, refreshToken: 'refresh-1' }))
-      .mockResolvedValueOnce(response({ accessToken: 'access-2', expiresIn: 900, refreshToken: 'refresh-2' }))
+      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31 }))
+      .mockResolvedValueOnce(response({ accessToken: 'access-2', expiresIn: 900 }))
     vi.stubGlobal('fetch', fetchMock)
-    render(<AuthProvider><Harness /></AuthProvider>)
+    render(<AuthProvider restoreSession={false}><Harness /></AuthProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'login' }))
     await act(async () => { await Promise.resolve() })
@@ -59,8 +81,8 @@ describe('AuthProvider session lifecycle', () => {
 
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
     expect(screen.getByText('access-2')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenLastCalledWith('/v1/auth/refresh', expect.objectContaining({
-      body: JSON.stringify({ refreshToken: 'refresh-1' }),
+    expect(fetchMock).toHaveBeenLastCalledWith('/v1/auth/browser/refresh', expect.objectContaining({
+      credentials: 'include',
     }))
   })
 
@@ -68,18 +90,18 @@ describe('AuthProvider session lifecycle', () => {
     let finishRevocation!: () => void
     const revocation = new Promise<Response>((resolve) => { finishRevocation = () => resolve(new Response(null, { status: 204 })) })
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 900, refreshToken: 'refresh-1' }))
+      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 900 }))
       .mockReturnValueOnce(revocation)
     vi.stubGlobal('fetch', fetchMock)
-    render(<AuthProvider><Harness /></AuthProvider>)
+    render(<AuthProvider restoreSession={false}><Harness /></AuthProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'login' }))
     expect(await screen.findByText('access-1')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'logout' }))
 
     expect(screen.getByText('signed-out')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenLastCalledWith('/v1/auth/revoke', expect.objectContaining({
-      body: JSON.stringify({ refreshToken: 'refresh-1' }),
+    expect(fetchMock).toHaveBeenLastCalledWith('/v1/auth/browser/revoke', expect.objectContaining({
+      credentials: 'include',
     }))
     finishRevocation()
   })
@@ -88,14 +110,14 @@ describe('AuthProvider session lifecycle', () => {
     vi.useFakeTimers()
     let finishRefresh!: () => void
     const pendingRefresh = new Promise<Response>((resolve) => {
-      finishRefresh = () => resolve(response({ accessToken: 'stale-access', expiresIn: 900, refreshToken: 'stale-refresh' }))
+      finishRefresh = () => resolve(response({ accessToken: 'stale-access', expiresIn: 900 }))
     })
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31, refreshToken: 'refresh-1' }))
+      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31 }))
       .mockReturnValueOnce(pendingRefresh)
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetchMock)
-    render(<AuthProvider><Harness /></AuthProvider>)
+    render(<AuthProvider restoreSession={false}><Harness /></AuthProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'login' }))
     await act(async () => { await Promise.resolve() })
@@ -111,10 +133,10 @@ describe('AuthProvider session lifecycle', () => {
   it('clears the session when refresh is rejected', async () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31, refreshToken: 'refresh-1' }))
+      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31 }))
       .mockResolvedValueOnce(response({ detail: 'Sessão expirada.' }, 401))
     vi.stubGlobal('fetch', fetchMock)
-    render(<AuthProvider><Harness /></AuthProvider>)
+    render(<AuthProvider restoreSession={false}><Harness /></AuthProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'login' }))
     await act(async () => { await Promise.resolve() })
@@ -123,8 +145,8 @@ describe('AuthProvider session lifecycle', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
 
     expect(screen.getByText('signed-out')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenLastCalledWith('/v1/auth/refresh', expect.objectContaining({
-      body: JSON.stringify({ refreshToken: 'refresh-1' }),
+    expect(fetchMock).toHaveBeenLastCalledWith('/v1/auth/browser/refresh', expect.objectContaining({
+      credentials: 'include',
     }))
   })
 
@@ -132,14 +154,14 @@ describe('AuthProvider session lifecycle', () => {
     vi.useFakeTimers()
     let finishRefresh!: () => void
     const pendingRefresh = new Promise<Response>((resolve) => {
-      finishRefresh = () => resolve(response({ accessToken: 'stale-access', expiresIn: 900, refreshToken: 'stale-refresh' }))
+      finishRefresh = () => resolve(response({ accessToken: 'stale-access', expiresIn: 900 }))
     })
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31, refreshToken: 'refresh-1' }))
+      .mockResolvedValueOnce(response({ accessToken: 'access-1', expiresIn: 31 }))
       .mockReturnValueOnce(pendingRefresh)
-      .mockResolvedValueOnce(response({ accessToken: 'access-2', expiresIn: 900, refreshToken: 'refresh-2' }))
+      .mockResolvedValueOnce(response({ accessToken: 'access-2', expiresIn: 900 }))
     vi.stubGlobal('fetch', fetchMock)
-    render(<AuthProvider><Harness /></AuthProvider>)
+    render(<AuthProvider restoreSession={false}><Harness /></AuthProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'login' }))
     await act(async () => { await Promise.resolve() })
@@ -158,21 +180,21 @@ describe('AuthProvider session lifecycle', () => {
   it('shares one refresh across concurrent safe requests and retries each once', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(response({ accessToken: 'access-1', expiresIn: 900, refreshToken: 'refresh-1' }))
-      if (url === '/v1/auth/refresh') return Promise.resolve(response({ accessToken: 'access-2', expiresIn: 900, refreshToken: 'refresh-2' }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(response({ accessToken: 'access-1', expiresIn: 900 }))
+      if (url === '/v1/auth/browser/refresh') return Promise.resolve(response({ accessToken: 'access-2', expiresIn: 900 }))
       const authorization = (init?.headers as Record<string, string>)?.Authorization
       if (authorization === 'Bearer access-1') return Promise.resolve(response({ detail: 'Sessão expirada.' }, 401))
       return Promise.resolve(response({ value: url.endsWith('/a') ? 'a' : 'b' }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<AuthProvider><SafeRequestHarness /></AuthProvider>)
+    render(<AuthProvider restoreSession={false}><SafeRequestHarness /></AuthProvider>)
 
     fireEvent.click(screen.getByRole('button', { name: 'login-safe' }))
     await act(async () => { await Promise.resolve() })
     fireEvent.click(screen.getByRole('button', { name: 'load-safe' }))
 
     expect(await screen.findByText('a,b')).toBeInTheDocument()
-    expect(fetchMock.mock.calls.filter(([url]) => url === '/v1/auth/refresh')).toHaveLength(1)
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/v1/auth/browser/refresh')).toHaveLength(1)
     expect(fetchMock.mock.calls.filter(([, init]) => (init?.headers as Record<string, string>)?.Authorization === 'Bearer access-2')).toHaveLength(2)
   })
 

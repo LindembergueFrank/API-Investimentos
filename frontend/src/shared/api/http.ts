@@ -36,19 +36,21 @@ export async function getJsonWithRefresh<T>(path: string, accessToken: string, r
   return response.json() as Promise<T>
 }
 
-export async function postJson<T>(path: string, body: unknown): Promise<T> {
+export async function postJsonWithCredentials<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    credentials: 'include',
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
   })
 
-  if (!response.ok) {
-    const fallback = 'Não foi possível concluir a solicitação.'
-    throw new Error(await readProblem(response, fallback))
-  }
-
+  if (!response.ok) throw new Error(await readProblem(response, 'Não foi possível concluir a solicitação.'))
   return response.json() as Promise<T>
+}
+
+export async function postNoContentWithCredentials(path: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}${path}`, { method: 'POST', credentials: 'include' })
+  if (!response.ok) throw new Error('Não foi possível encerrar a sessão no servidor.')
 }
 
 export async function postAuthenticatedJson<T>(path: string, body: unknown, accessToken: string): Promise<T> {
@@ -60,13 +62,4 @@ export async function postAuthenticatedJson<T>(path: string, body: unknown, acce
 
   if (!response.ok) throw new Error(await readProblem(response, 'Não foi possível concluir a solicitação.'))
   return response.json() as Promise<T>
-}
-
-export async function postNoContent(path: string, body: unknown): Promise<void> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!response.ok) throw new Error('Não foi possível encerrar a sessão no servidor.')
 }

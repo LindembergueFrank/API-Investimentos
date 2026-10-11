@@ -1,11 +1,9 @@
-import { postJson, postNoContent } from '../../shared/api/http'
+import { postJsonWithCredentials, postNoContentWithCredentials } from '../../shared/api/http'
 
 export type Session = {
   accessToken: string
   tokenType: 'Bearer'
   expiresIn: number
-  refreshToken: string
-  refreshExpiresIn: number
   roles: string[]
 }
 
@@ -29,13 +27,13 @@ function withRoles(session: SessionResponse): Session {
 }
 
 export async function authenticate(email: string, password: string) {
-  return withRoles(await postJson<SessionResponse>('/v1/auth/token', { email, password }))
+  return withRoles(await postJsonWithCredentials<SessionResponse>('/v1/auth/browser/token', { email, password }))
 }
 
-export async function refresh(refreshToken: string) {
-  return withRoles(await postJson<SessionResponse>('/v1/auth/refresh', { refreshToken }))
+export async function refresh() {
+  return withRoles(await postJsonWithCredentials<SessionResponse>('/v1/auth/browser/refresh'))
 }
 
-export function revoke(refreshToken: string) {
-  return postNoContent('/v1/auth/revoke', { refreshToken })
+export function revoke() {
+  return postNoContentWithCredentials('/v1/auth/browser/revoke')
 }
