@@ -26,10 +26,14 @@ public class AssetService {
     }
 
     @Transactional(readOnly = true)
-    public AssetPage list(int page, int size) {
+    public AssetPage list(String query, int page, int size) {
         if (page < 0 || size < 1 || size > 100) {
             throw new InvalidPaginationException();
         }
-        return repository.findPage(page, size);
+        String normalizedQuery = query == null ? "" : query.trim();
+        if (normalizedQuery.length() > 80) {
+            throw new InvalidAssetSearchException();
+        }
+        return repository.findPage(normalizedQuery, page, size);
     }
 }

@@ -8,6 +8,6 @@ import java.util.UUID;
 public interface AssetRepository {
     Asset save(Asset asset);
     boolean existsByMarketAndTicker(AssetMarket market, String ticker);
-    AssetPage findPage(int page, int size);
+    AssetPage findPage(String query, int page, int size);
     Optional<Asset> findById(UUID id);
 }

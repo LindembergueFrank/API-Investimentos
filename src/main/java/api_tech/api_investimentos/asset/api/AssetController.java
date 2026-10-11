@@ -49,9 +49,10 @@ public class AssetController {
     @GetMapping
     @Operation(summary = "Lista o catálogo de ativos")
     public ResponseEntity<AssetPageResponse> list(
+            @RequestParam(defaultValue = "") String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(AssetPageResponse.from(service.list(page, size)));
+        return ResponseEntity.ok(AssetPageResponse.from(service.list(query, page, size)));
     }
 }

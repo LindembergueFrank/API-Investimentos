@@ -35,9 +35,12 @@ public class JpaAssetRepository implements AssetRepository {
     }
 
     @Override
-    public AssetPage findPage(int page, int size) {
+    public AssetPage findPage(String query, int page, int size) {
         var sort = Sort.by("market").ascending().and(Sort.by("ticker").ascending());
-        var result = repository.findAll(PageRequest.of(page, size, sort));
+        var pageable = PageRequest.of(page, size, sort);
+        var result = query.isBlank()
+                ? repository.findAll(pageable)
+                : repository.search(query, pageable);
         return new AssetPage(result.getContent(), result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
