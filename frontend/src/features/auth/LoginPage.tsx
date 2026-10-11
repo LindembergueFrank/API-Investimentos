@@ -36,7 +36,7 @@ export function LoginPage() {
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="primary-button login-button" type="submit" disabled={submitting}>{submitting ? 'Entrando…' : 'Entrar'}</button>
         </form>
-        <small className="security-note">Sua sessão permanece somente nesta aba e não é salva no navegador.</small>
+        <small className="security-note">Sua sessão é renovada por um cookie seguro que não pode ser lido pelo JavaScript.</small>
       </section>
     </main>
   )

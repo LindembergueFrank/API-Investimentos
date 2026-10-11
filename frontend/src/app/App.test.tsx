@@ -10,7 +10,7 @@ describe('App', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('starts with the authentication boundary', () => {
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     expect(screen.getByRole('heading', { name: 'Acesse sua carteira' })).toBeInTheDocument()
     expect(screen.queryByText('Sem posições abertas')).not.toBeInTheDocument()
@@ -19,9 +19,8 @@ describe('App', () => {
   it('opens the dashboard after a successful login without persisting tokens', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({
         accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 900,
-        refreshToken: 'refresh-token', refreshExpiresIn: 2_592_000,
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({
         items: [{ id: 'portfolio-1', name: 'Longo prazo' }], page: 0, size: 100, totalElements: 1, totalPages: 1,
@@ -37,7 +36,7 @@ describe('App', () => {
       }], totalElements: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -48,7 +47,7 @@ describe('App', () => {
     expect(screen.getByText('Compra')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Navegação principal' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '+ Novo ativo' })).not.toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledWith('/v1/auth/token', expect.objectContaining({ method: 'POST' }))
+    expect(fetchMock).toHaveBeenCalledWith('/v1/auth/browser/token', expect.objectContaining({ method: 'POST', credentials: 'include' }))
     expect(fetchMock).toHaveBeenCalledWith('/v1/portfolios?page=0&size=100', expect.objectContaining({
       headers: { Authorization: 'Bearer access-token' },
     }))
@@ -59,14 +58,14 @@ describe('App', () => {
     const accessToken = accessTokenWithRoles('ADMIN')
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken, expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken, expiresIn: 900 }), { status: 200 }))
       if (url === '/v1/assets' && init?.method === 'POST') return Promise.resolve(new Response(JSON.stringify({
         id: 'asset-new', ticker: 'PETR4', name: 'Petrobras PN', market: 'B3', type: 'STOCK',
       }), { status: 201 }))
       return Promise.resolve(new Response(JSON.stringify({ items: [], totalElements: 0 }), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'admin@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -88,11 +87,11 @@ describe('App', () => {
   it('shows an honest empty state when the user has no portfolios', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900 }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 }), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -105,7 +104,7 @@ describe('App', () => {
   it('loads portfolios completely and searches the asset catalog with server-side pagination', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900 }), { status: 200 }))
       if (url === '/v1/portfolios?page=0&size=100') return Promise.resolve(new Response(JSON.stringify({
         items: [{ id: 'portfolio-1', name: 'Principal' }], totalElements: 101, totalPages: 2,
       }), { status: 200 }))
@@ -125,7 +124,7 @@ describe('App', () => {
       return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -145,12 +144,12 @@ describe('App', () => {
   it('creates the first portfolio with authentication and updates the empty dashboard', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900 }), { status: 200 }))
       if (url === '/v1/portfolios' && init?.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ id: 'portfolio-1', name: 'Reserva segura' }), { status: 201 }))
       return Promise.resolve(new Response(JSON.stringify({ items: [], totalElements: 0 }), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -171,7 +170,7 @@ describe('App', () => {
   it('switches between owned portfolios and reloads their details', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900 }), { status: 200 }))
       if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({
         items: [{ id: 'portfolio-1', name: 'Longo prazo' }, { id: 'portfolio-2', name: 'Reserva' }], totalElements: 2,
       }), { status: 200 }))
@@ -182,7 +181,7 @@ describe('App', () => {
       return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -202,7 +201,7 @@ describe('App', () => {
     let createAttempts = 0
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900 }), { status: 200 }))
       if (url === '/v1/transactions' && init?.method === 'POST') {
         createAttempts += 1
         return Promise.resolve(createAttempts === 1
@@ -215,7 +214,7 @@ describe('App', () => {
       return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -244,7 +243,7 @@ describe('App', () => {
   it('keeps the current portfolio visible when switching fails', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900 }), { status: 200 }))
       if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({
         items: [{ id: 'portfolio-1', name: 'Longo prazo' }, { id: 'portfolio-2', name: 'Reserva' }], totalElements: 2,
       }), { status: 200 }))
@@ -254,7 +253,7 @@ describe('App', () => {
       return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -268,7 +267,7 @@ describe('App', () => {
   it('paginates the complete transaction history on the server', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900 }), { status: 200 }))
       if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({ items: [{ id: 'portfolio-1', name: 'Longo prazo' }], totalElements: 1 }), { status: 200 }))
       if (url.startsWith('/v1/assets?')) return Promise.resolve(new Response(JSON.stringify({ items: [{ id: 'asset-1', ticker: 'ACME3', name: 'Acme S.A.', market: 'B3', type: 'STOCK' }], totalElements: 1 }), { status: 200 }))
       if (url.includes('/positions')) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
@@ -279,7 +278,7 @@ describe('App', () => {
       }), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
@@ -299,11 +298,11 @@ describe('App', () => {
   it('shows the API problem when dashboard loading fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
-      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/auth/browser/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900 }), { status: 200 }))
       if (url.startsWith('/v1/assets?')) return Promise.resolve(new Response(JSON.stringify({ items: [], totalElements: 0 }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ title: 'Acesso negado', detail: 'A sessão não permite consultar esta carteira.' }), { status: 403 }))
     }))
-    render(<App />)
+    render(<App restoreSession={false} />)
 
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })

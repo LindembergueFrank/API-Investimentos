@@ -4,7 +4,11 @@ import { AuthProvider, useAuth } from '../features/auth/AuthContext'
 import { LoginPage } from '../features/auth/LoginPage'
 
 function AuthenticatedApp() {
-  const { session } = useAuth()
+  const { session, isRestoring } = useAuth()
+
+  if (isRestoring) {
+    return <main className="login-page" aria-live="polite">Restaurando sessão…</main>
+  }
 
   if (!session) {
     return <LoginPage />
@@ -17,6 +21,6 @@ function AuthenticatedApp() {
   )
 }
 
-export function App() {
-  return <AuthProvider><AuthenticatedApp /></AuthProvider>
+export function App({ restoreSession = true }: { restoreSession?: boolean }) {
+  return <AuthProvider restoreSession={restoreSession}><AuthenticatedApp /></AuthProvider>
 }
