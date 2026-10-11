@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { AssetForm } from '../assets/AssetForm'
 import { OperationForm } from '../transactions/OperationForm'
 import { PortfolioForm } from '../portfolios/PortfolioForm'
 import { loadDashboard, loadPortfolioDetails, loadTransactionPage, type Asset, type Portfolio, type Position, type Transaction, type TransactionPage } from './dashboardApi'
@@ -17,6 +18,7 @@ export function DashboardPage() {
   const [isSwitchingPortfolio, setIsSwitchingPortfolio] = useState(false)
   const [showOperationForm, setShowOperationForm] = useState(false)
   const [showPortfolioForm, setShowPortfolioForm] = useState(false)
+  const [showAssetForm, setShowAssetForm] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const portfolioRequest = useRef<AbortController | null>(null)
@@ -79,6 +81,16 @@ export function DashboardPage() {
     setShowPortfolioForm(false)
   }
 
+  function assetCreated(asset: Asset) {
+    setData((current) => {
+      if (!current) return current
+      const assets = new Map(current.assets)
+      assets.set(asset.id, asset)
+      return { ...current, assets }
+    })
+    setShowAssetForm(false)
+  }
+
   async function selectHistoryPage(page: number) {
     if (!data?.selectedPortfolio || !data.transactionPage || page < 0 || page >= data.transactionPage.totalPages) return
     setIsLoadingHistory(true)
@@ -100,7 +112,7 @@ export function DashboardPage() {
     <div className="dashboard">
       <section className="hero-row">
         <div><span className="eyebrow">VISÃO GERAL</span><h1>Seu patrimônio, com clareza.</h1><p>Posições calculadas diretamente do histórico de compras e vendas.</p></div>
-        <div className="hero-actions"><button className="secondary-button" type="button" onClick={() => setShowPortfolioForm(true)}>+ Nova carteira</button>{data.selectedPortfolio && data.assets.size > 0 && <button className="primary-button" type="button" onClick={() => setShowOperationForm(true)}>+ Nova operação</button>}{data.portfolios.length > 1 && <label className="portfolio-selector">Carteira
+        <div className="hero-actions">{session?.roles.includes('ADMIN') && <button className="secondary-button" type="button" onClick={() => setShowAssetForm(true)}>+ Novo ativo</button>}<button className="secondary-button" type="button" onClick={() => setShowPortfolioForm(true)}>+ Nova carteira</button>{data.selectedPortfolio && data.assets.size > 0 && <button className="primary-button" type="button" onClick={() => setShowOperationForm(true)}>+ Nova operação</button>}{data.portfolios.length > 1 && <label className="portfolio-selector">Carteira
           <select value={data.selectedPortfolio?.id ?? ''} disabled={isSwitchingPortfolio} onChange={(event) => void selectPortfolio(event.target.value)}>
             {data.portfolios.map((portfolio) => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}
           </select>
@@ -108,6 +120,7 @@ export function DashboardPage() {
       </section>
       {portfolioError && <div className="inline-error" role="alert">{portfolioError}</div>}
       {showPortfolioForm && session && <PortfolioForm accessToken={session.accessToken} onCancel={() => setShowPortfolioForm(false)} onCreated={portfolioCreated} />}
+      {showAssetForm && session?.roles.includes('ADMIN') && <AssetForm accessToken={session.accessToken} onCancel={() => setShowAssetForm(false)} onCreated={assetCreated} />}
       {showOperationForm && session && data.selectedPortfolio && <OperationForm accessToken={session.accessToken} portfolio={data.selectedPortfolio} assets={[...data.assets.values()]} onCancel={() => setShowOperationForm(false)} onCreated={refreshSelectedPortfolio} />}
       <section className="summary-grid" aria-label="Resumo da carteira">
         <article className="summary-card"><span>Carteira selecionada</span><strong>{data.selectedPortfolio?.name ?? '—'}</strong><small>{isSwitchingPortfolio ? 'Atualizando posições…' : 'Dados reais da carteira'}</small></article>

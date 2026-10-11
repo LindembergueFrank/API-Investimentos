@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 
+function accessTokenWithRoles(...roles: string[]) {
+  return `header.${btoa(JSON.stringify({ roles }))}.signature`
+}
+
 describe('App', () => {
   afterEach(() => vi.unstubAllGlobals())
 
@@ -43,11 +47,42 @@ describe('App', () => {
     expect(screen.getAllByText('ACME3')).toHaveLength(2)
     expect(screen.getByText('Compra')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Navegação principal' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Novo ativo' })).not.toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/v1/auth/token', expect.objectContaining({ method: 'POST' }))
     expect(fetchMock).toHaveBeenCalledWith('/v1/portfolios?page=0&size=100', expect.objectContaining({
       headers: { Authorization: 'Bearer access-token' },
     }))
     expect(localStorage).toHaveLength(0)
+  })
+
+  it('allows an administrator to create an asset without retrying the protected POST', async () => {
+    const accessToken = accessTokenWithRoles('ADMIN')
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken, expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/assets' && init?.method === 'POST') return Promise.resolve(new Response(JSON.stringify({
+        id: 'asset-new', ticker: 'PETR4', name: 'Petrobras PN', market: 'B3', type: 'STOCK',
+      }), { status: 201 }))
+      return Promise.resolve(new Response(JSON.stringify({ items: [], totalElements: 0 }), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'admin@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    fireEvent.click(await screen.findByRole('button', { name: '+ Novo ativo' }))
+    fireEvent.change(screen.getByLabelText('Ticker'), { target: { value: 'petr4' } })
+    fireEvent.change(screen.getByLabelText('Nome'), { target: { value: '  Petrobras PN  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar ativo' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/v1/assets', expect.objectContaining({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ market: 'B3', ticker: 'PETR4', type: 'STOCK', name: 'Petrobras PN' }),
+    })))
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/v1/assets')).toHaveLength(1)
+    expect(screen.queryByRole('heading', { name: 'Cadastrar ativo' })).not.toBeInTheDocument()
   })
 
   it('shows an honest empty state when the user has no portfolios', async () => {
