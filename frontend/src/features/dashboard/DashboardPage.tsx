@@ -10,7 +10,7 @@ const decimal = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 8 })
 const date = new Intl.DateTimeFormat('pt-BR')
 
 export function DashboardPage() {
-  const { session } = useAuth()
+  const { session, getJson } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [portfolioError, setPortfolioError] = useState<string | null>(null)
@@ -23,7 +23,7 @@ export function DashboardPage() {
     if (!session) return
     const controller = new AbortController()
     setError(null)
-    loadDashboard(session.accessToken, controller.signal)
+    loadDashboard(getJson, controller.signal)
       .then(({ portfolios, positions, transactions, assets, selectedPortfolio }) => setData({
         portfolios: portfolios.items, totalPortfolios: portfolios.totalElements, selectedPortfolio, positions, transactions,
         assets: new Map(assets.items.map((asset) => [asset.id, asset])),
@@ -35,7 +35,7 @@ export function DashboardPage() {
       controller.abort()
       portfolioRequest.current?.abort()
     }
-  }, [session])
+  }, [session, getJson])
 
   async function selectPortfolio(portfolioId: string) {
     if (!session || !data || portfolioId === data.selectedPortfolio?.id) return
@@ -48,7 +48,7 @@ export function DashboardPage() {
     setIsSwitchingPortfolio(true)
     setPortfolioError(null)
     try {
-      const details = await loadPortfolioDetails(portfolioId, session.accessToken, controller.signal)
+      const details = await loadPortfolioDetails(portfolioId, getJson, controller.signal)
       setData((current) => current ? { ...current, ...details, selectedPortfolio } : current)
     } catch (cause: unknown) {
       if (!controller.signal.aborted) setPortfolioError(cause instanceof Error ? cause.message : 'Não foi possível carregar a carteira selecionada.')
@@ -59,7 +59,7 @@ export function DashboardPage() {
 
   async function refreshSelectedPortfolio() {
     if (!session || !data?.selectedPortfolio) return
-    const details = await loadPortfolioDetails(data.selectedPortfolio.id, session.accessToken)
+    const details = await loadPortfolioDetails(data.selectedPortfolio.id, getJson)
     setData((current) => current ? { ...current, ...details } : current)
     setShowOperationForm(false)
   }
