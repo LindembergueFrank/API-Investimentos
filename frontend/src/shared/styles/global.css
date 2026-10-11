@@ -93,6 +93,10 @@ main { padding: 48px 4.5vw 64px; }
 .activity-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); }
 .activity-list div { display: grid; gap: 3px; }
 .activity-list small, .activity-list time { color: var(--muted); font-size: 10px; }
+.history-pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; }
+.history-pagination button { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; color: var(--navy); font-weight: 700; cursor: pointer; }
+.history-pagination button:disabled { opacity: .5; cursor: not-allowed; }
+.history-pagination span { color: var(--muted); font-size: 12px; text-align: center; }
 .transaction-kind { padding: 4px 7px; border-radius: 999px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .transaction-kind.buy { color: #176b42; background: #e9f8ef; }
 .transaction-kind.sell { color: #9f2d26; background: #fff0ef; }
