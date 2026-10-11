@@ -83,7 +83,6 @@ class PositionReadPathBenchmark {
 
     private void settleHeap() {
         System.gc();
-        System.runFinalization();
     }
 
     private long usedHeap() {
