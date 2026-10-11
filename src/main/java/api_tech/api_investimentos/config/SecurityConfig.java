@@ -63,6 +63,9 @@ public class SecurityConfig {
                                 "/v1/auth/token",
                                 "/v1/auth/refresh",
                                 "/v1/auth/revoke",
+                                "/v1/auth/browser/token",
+                                "/v1/auth/browser/refresh",
+                                "/v1/auth/browser/revoke",
                                 "/v1/users")
                         .permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
@@ -112,7 +115,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setExposedHeaders(List.of("Location"));
-        configuration.setAllowCredentials(false);
+        configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
         var source = new UrlBasedCorsConfigurationSource();
