@@ -102,7 +102,7 @@ describe('App', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
-  it('loads every reported portfolio and asset page before rendering the dashboard', async () => {
+  it('loads portfolios completely and searches the asset catalog with server-side pagination', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
       if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
@@ -112,11 +112,14 @@ describe('App', () => {
       if (url === '/v1/portfolios?page=1&size=100') return Promise.resolve(new Response(JSON.stringify({
         items: [{ id: 'portfolio-101', name: 'Carteira 101' }], totalElements: 101, totalPages: 2,
       }), { status: 200 }))
-      if (url === '/v1/assets?page=0&size=100') return Promise.resolve(new Response(JSON.stringify({
-        items: [], totalElements: 101, totalPages: 2,
+      if (url === '/v1/assets?query=&page=0&size=20') return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'asset-initial', ticker: 'INIT3', name: 'Ativo inicial', market: 'B3', type: 'STOCK' }], page: 0, size: 20, totalElements: 101, totalPages: 6,
       }), { status: 200 }))
-      if (url === '/v1/assets?page=1&size=100') return Promise.resolve(new Response(JSON.stringify({
-        items: [{ id: 'asset-101', ticker: 'PAGE3', name: 'Ativo paginado', market: 'B3', type: 'STOCK' }], totalElements: 101, totalPages: 2,
+      if (url === '/v1/assets?query=PAGE&page=0&size=20') return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'asset-101', ticker: 'PAGE3', name: 'Ativo pesquisado', market: 'B3', type: 'STOCK' }], page: 0, size: 20, totalElements: 21, totalPages: 2,
+      }), { status: 200 }))
+      if (url === '/v1/assets?query=PAGE&page=1&size=20') return Promise.resolve(new Response(JSON.stringify({
+        items: [{ id: 'asset-121', ticker: 'PAGE4', name: 'Próxima página', market: 'B3', type: 'STOCK' }], page: 1, size: 20, totalElements: 21, totalPages: 2,
       }), { status: 200 }))
       if (url.includes('/positions')) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ content: [], totalElements: 0 }), { status: 200 }))
@@ -130,9 +133,13 @@ describe('App', () => {
 
     expect(await screen.findByRole('option', { name: 'Carteira 101' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '+ Nova operação' }))
-    expect(screen.getByRole('option', { name: 'PAGE3 — Ativo paginado' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Buscar ativo'), { target: { value: 'PAGE' } })
+    expect(await screen.findByRole('option', { name: 'PAGE3 — Ativo pesquisado' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Próximos ativos' }))
+    expect(await screen.findByRole('option', { name: 'PAGE4 — Próxima página' })).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/v1/portfolios?page=1&size=100', expect.objectContaining({ signal: expect.any(AbortSignal) }))
-    expect(fetchMock).toHaveBeenCalledWith('/v1/assets?page=1&size=100', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(fetchMock).toHaveBeenCalledWith('/v1/assets?query=PAGE&page=1&size=20', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(fetchMock).not.toHaveBeenCalledWith('/v1/assets?page=1&size=100', expect.anything())
   })
 
   it('creates the first portfolio with authentication and updates the empty dashboard', async () => {

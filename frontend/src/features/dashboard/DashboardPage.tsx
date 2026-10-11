@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { AssetForm } from '../assets/AssetForm'
+import type { AssetPage } from '../assets/assetApi'
 import { OperationForm } from '../transactions/OperationForm'
 import { PortfolioForm } from '../portfolios/PortfolioForm'
 import { loadDashboard, loadPortfolioDetails, loadTransactionPage, type Asset, type Portfolio, type Position, type Transaction, type TransactionPage } from './dashboardApi'
 
-type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; transactionPage: TransactionPage | null; assets: Map<string, Asset> }
+type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; transactionPage: TransactionPage | null; assets: Map<string, Asset>; assetPage: AssetPage }
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const decimal = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 8 })
 const date = new Intl.DateTimeFormat('pt-BR')
@@ -31,6 +32,7 @@ export function DashboardPage() {
       .then(({ portfolios, positions, transactions, transactionPage, assets, selectedPortfolio }) => setData({
         portfolios: portfolios.items, totalPortfolios: portfolios.totalElements, selectedPortfolio, positions, transactions, transactionPage,
         assets: new Map(assets.items.map((asset) => [asset.id, asset])),
+        assetPage: { items: assets.items, page: assets.page ?? 0, size: assets.size ?? 20, totalElements: assets.totalElements, totalPages: assets.totalPages ?? Math.ceil(assets.totalElements / 20) },
       }))
       .catch((cause: unknown) => {
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o painel.')
@@ -61,10 +63,15 @@ export function DashboardPage() {
     }
   }
 
-  async function refreshSelectedPortfolio() {
+  async function refreshSelectedPortfolio(asset?: Asset) {
     if (!session || !data?.selectedPortfolio) return
     const details = await loadPortfolioDetails(data.selectedPortfolio.id, getJson)
-    setData((current) => current ? { ...current, ...details } : current)
+    setData((current) => {
+      if (!current) return current
+      const assets = new Map(current.assets)
+      if (asset) assets.set(asset.id, asset)
+      return { ...current, ...details, assets }
+    })
     setShowOperationForm(false)
   }
 
@@ -121,7 +128,7 @@ export function DashboardPage() {
       {portfolioError && <div className="inline-error" role="alert">{portfolioError}</div>}
       {showPortfolioForm && session && <PortfolioForm accessToken={session.accessToken} onCancel={() => setShowPortfolioForm(false)} onCreated={portfolioCreated} />}
       {showAssetForm && session?.roles.includes('ADMIN') && <AssetForm accessToken={session.accessToken} onCancel={() => setShowAssetForm(false)} onCreated={assetCreated} />}
-      {showOperationForm && session && data.selectedPortfolio && <OperationForm accessToken={session.accessToken} portfolio={data.selectedPortfolio} assets={[...data.assets.values()]} onCancel={() => setShowOperationForm(false)} onCreated={refreshSelectedPortfolio} />}
+      {showOperationForm && session && data.selectedPortfolio && <OperationForm accessToken={session.accessToken} portfolio={data.selectedPortfolio} assets={[...data.assets.values()]} initialAssetPage={data.assetPage} getJson={getJson} onCancel={() => setShowOperationForm(false)} onCreated={refreshSelectedPortfolio} />}
       <section className="summary-grid" aria-label="Resumo da carteira">
         <article className="summary-card"><span>Carteira selecionada</span><strong>{data.selectedPortfolio?.name ?? '—'}</strong><small>{isSwitchingPortfolio ? 'Atualizando posições…' : 'Dados reais da carteira'}</small></article>
         <article className="summary-card"><span>Posições abertas</span><strong>{data.positions.length}</strong><small>{data.selectedPortfolio?.name ?? 'Nenhuma carteira'}</small></article>
