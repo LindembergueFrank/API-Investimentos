@@ -3,16 +3,29 @@ export type Position = { assetId: string; quantity: number; averagePrice: number
 export type Asset = { id: string; market: string; ticker: string; type: string; name: string }
 export type Transaction = { id: string; assetId: string; type: 'BUY' | 'SELL'; quantity: number; unitPrice: number; fees: number; occurredAt: string }
 type ItemPage<T> = { items: T[]; totalElements: number; totalPages?: number }
-type TransactionPage = { content: Transaction[]; totalElements: number }
+export type TransactionPage = { content: Transaction[]; page: number; size: number; totalElements: number; totalPages: number }
 
 export type AuthenticatedGet = <T>(path: string, signal?: AbortSignal) => Promise<T>
 
+export async function loadTransactionPage(portfolioId: string, page: number, size: number, getJson: AuthenticatedGet, signal?: AbortSignal) {
+  const response = await getJson<Partial<TransactionPage> & Pick<TransactionPage, 'content' | 'totalElements'>>(
+    `/v1/portfolios/${portfolioId}/transactions?page=${page}&size=${size}`,
+    signal,
+  )
+  return {
+    ...response,
+    page: response.page ?? page,
+    size: response.size ?? size,
+    totalPages: response.totalPages ?? Math.ceil(response.totalElements / size),
+  }
+}
+
 export async function loadPortfolioDetails(portfolioId: string, getJson: AuthenticatedGet, signal?: AbortSignal) {
-  const [positions, transactions] = await Promise.all([
+  const [positions, transactionPage] = await Promise.all([
     getJson<Position[]>(`/v1/portfolios/${portfolioId}/positions`, signal),
-    getJson<TransactionPage>(`/v1/portfolios/${portfolioId}/transactions?page=0&size=5`, signal),
+    loadTransactionPage(portfolioId, 0, 10, getJson, signal),
   ])
-  return { positions, transactions: transactions.content }
+  return { positions, transactions: transactionPage.content, transactionPage }
 }
 
 async function loadAllItems<T>(path: string, getJson: AuthenticatedGet, signal?: AbortSignal): Promise<ItemPage<T>> {
@@ -34,8 +47,8 @@ export async function loadDashboard(getJson: AuthenticatedGet, signal?: AbortSig
     loadAllItems<Asset>('/v1/assets', getJson, signal),
   ])
   const selectedPortfolio = portfolios.items[0] ?? null
-  if (!selectedPortfolio) return { portfolios, assets, positions: [], transactions: [], selectedPortfolio }
+  if (!selectedPortfolio) return { portfolios, assets, positions: [], transactions: [], transactionPage: null, selectedPortfolio }
 
-  const { positions, transactions } = await loadPortfolioDetails(selectedPortfolio.id, getJson, signal)
-  return { portfolios, assets, positions, transactions, selectedPortfolio }
+  const { positions, transactions, transactionPage } = await loadPortfolioDetails(selectedPortfolio.id, getJson, signal)
+  return { portfolios, assets, positions, transactions, transactionPage, selectedPortfolio }
 }

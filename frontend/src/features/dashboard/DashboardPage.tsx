@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { OperationForm } from '../transactions/OperationForm'
 import { PortfolioForm } from '../portfolios/PortfolioForm'
-import { loadDashboard, loadPortfolioDetails, type Asset, type Portfolio, type Position, type Transaction } from './dashboardApi'
+import { loadDashboard, loadPortfolioDetails, loadTransactionPage, type Asset, type Portfolio, type Position, type Transaction, type TransactionPage } from './dashboardApi'
 
-type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; assets: Map<string, Asset> }
+type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; transactionPage: TransactionPage | null; assets: Map<string, Asset> }
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const decimal = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 8 })
 const date = new Intl.DateTimeFormat('pt-BR')
@@ -17,6 +17,8 @@ export function DashboardPage() {
   const [isSwitchingPortfolio, setIsSwitchingPortfolio] = useState(false)
   const [showOperationForm, setShowOperationForm] = useState(false)
   const [showPortfolioForm, setShowPortfolioForm] = useState(false)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const portfolioRequest = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -24,8 +26,8 @@ export function DashboardPage() {
     const controller = new AbortController()
     setError(null)
     loadDashboard(getJson, controller.signal)
-      .then(({ portfolios, positions, transactions, assets, selectedPortfolio }) => setData({
-        portfolios: portfolios.items, totalPortfolios: portfolios.totalElements, selectedPortfolio, positions, transactions,
+      .then(({ portfolios, positions, transactions, transactionPage, assets, selectedPortfolio }) => setData({
+        portfolios: portfolios.items, totalPortfolios: portfolios.totalElements, selectedPortfolio, positions, transactions, transactionPage,
         assets: new Map(assets.items.map((asset) => [asset.id, asset])),
       }))
       .catch((cause: unknown) => {
@@ -72,8 +74,23 @@ export function DashboardPage() {
       selectedPortfolio: portfolio,
       positions: [],
       transactions: [],
+      transactionPage: null,
     } : current)
     setShowPortfolioForm(false)
+  }
+
+  async function selectHistoryPage(page: number) {
+    if (!data?.selectedPortfolio || !data.transactionPage || page < 0 || page >= data.transactionPage.totalPages) return
+    setIsLoadingHistory(true)
+    setHistoryError(null)
+    try {
+      const transactionPage = await loadTransactionPage(data.selectedPortfolio.id, page, data.transactionPage.size, getJson)
+      setData((current) => current ? { ...current, transactions: transactionPage.content, transactionPage } : current)
+    } catch (cause: unknown) {
+      setHistoryError(cause instanceof Error ? cause.message : 'Não foi possível carregar o histórico.')
+    } finally {
+      setIsLoadingHistory(false)
+    }
   }
 
   if (error) return <div className="dashboard"><section className="panel status-panel" role="alert"><h1>Não foi possível carregar o painel</h1><p>{error}</p></section></div>
@@ -117,8 +134,9 @@ export function DashboardPage() {
           )}
         </article>
         <aside className="panel activity-panel">
-          <div className="panel-heading"><div><span className="eyebrow">HISTÓRICO</span><h2>Atividade recente</h2></div></div>
+          <div className="panel-heading"><div><span className="eyebrow">HISTÓRICO</span><h2>Todas as operações</h2></div></div>
           <div className="activity-line" />
+          {historyError && <p className="inline-error" role="alert">{historyError}</p>}
           {data.transactions.length === 0 ? <p className="muted">Nenhuma operação registrada nesta carteira.</p> : <ol className="activity-list">
             {data.transactions.map((transaction) => <li key={transaction.id}>
               <span className={`transaction-kind ${transaction.type.toLowerCase()}`}>{transaction.type === 'BUY' ? 'Compra' : 'Venda'}</span>
@@ -126,6 +144,11 @@ export function DashboardPage() {
               <time dateTime={transaction.occurredAt}>{date.format(new Date(transaction.occurredAt))}</time>
             </li>)}
           </ol>}
+          {data.transactionPage && data.transactionPage.totalPages > 1 && <nav className="history-pagination" aria-label="Paginação do histórico">
+            <button type="button" disabled={isLoadingHistory || data.transactionPage.page === 0} onClick={() => void selectHistoryPage(data.transactionPage!.page - 1)}>Anterior</button>
+            <span aria-live="polite">Página {data.transactionPage.page + 1} de {data.transactionPage.totalPages}</span>
+            <button type="button" disabled={isLoadingHistory || data.transactionPage.page + 1 >= data.transactionPage.totalPages} onClick={() => void selectHistoryPage(data.transactionPage!.page + 1)}>Próxima</button>
+          </nav>}
         </aside>
       </section>
     </div>

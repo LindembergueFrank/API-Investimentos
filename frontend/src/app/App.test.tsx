@@ -223,6 +223,37 @@ describe('App', () => {
     expect(screen.getAllByText('Longo prazo').length).toBeGreaterThan(0)
   })
 
+  it('paginates the complete transaction history on the server', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url.startsWith('/v1/portfolios?')) return Promise.resolve(new Response(JSON.stringify({ items: [{ id: 'portfolio-1', name: 'Longo prazo' }], totalElements: 1 }), { status: 200 }))
+      if (url.startsWith('/v1/assets?')) return Promise.resolve(new Response(JSON.stringify({ items: [{ id: 'asset-1', ticker: 'ACME3', name: 'Acme S.A.', market: 'B3', type: 'STOCK' }], totalElements: 1 }), { status: 200 }))
+      if (url.includes('/positions')) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      const page = url.includes('page=1') ? 1 : 0
+      return Promise.resolve(new Response(JSON.stringify({
+        content: [{ id: `transaction-${page}`, assetId: 'asset-1', type: page === 0 ? 'BUY' : 'SELL', quantity: 1, unitPrice: 25, fees: 0, occurredAt: '2026-10-09T12:00:00Z' }],
+        page, size: 10, totalElements: 11, totalPages: 2,
+      }), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByText('Página 1 de 2')).toBeInTheDocument()
+    expect(screen.getByText('Compra')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Próxima' }))
+
+    expect(await screen.findByText('Página 2 de 2')).toBeInTheDocument()
+    expect(screen.getByText('Venda')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/v1/portfolios/portfolio-1/transactions?page=1&size=10', expect.objectContaining({
+      headers: { Authorization: 'Bearer access-token' },
+    }))
+  })
+
   it('shows the API problem when dashboard loading fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()
