@@ -63,6 +63,14 @@ main { padding: 48px 4.5vw 64px; }
 .empty-state p { max-width: 360px; margin: 0 0 18px; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .activity-line { height: 1px; margin: 24px 0; background: var(--line); }
 .muted { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.status-panel { min-height: 220px; display: grid; align-content: center; }
+.status-panel h1 { margin: 0 0 8px; font-size: 22px; }
+.status-panel p { margin: 0; color: var(--muted); }
+.position-list { margin-top: 20px; border-top: 1px solid var(--line); }
+.position-row { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(110px, .7fr)); gap: 20px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.position-row > div { display: grid; gap: 4px; }
+.position-row span, .position-row small { color: var(--muted); font-size: 11px; }
+.position-row strong { font-size: 13px; }
 .login-page { min-height: 100vh; padding: 32px; display: grid; place-items: center; background: radial-gradient(circle at top left, #e7efff, #f7f9fc 45%); }
 .login-card { width: min(100%, 430px); padding: 38px; border: 1px solid var(--line); border-radius: 20px; background: var(--white); box-shadow: 0 24px 70px rgb(38 56 94 / 12%); }
 .login-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 42px; color: var(--navy); }
@@ -87,6 +95,8 @@ main { padding: 48px 4.5vw 64px; }
   .hero-row { align-items: stretch; flex-direction: column; }
   .primary-button { align-self: flex-start; }
   .summary-grid, .content-grid { grid-template-columns: 1fr; }
+  .position-row { grid-template-columns: 1fr 1fr; }
+  .position-row > div:first-child { grid-column: 1 / -1; }
 }
 
 @media (max-width: 520px) {
