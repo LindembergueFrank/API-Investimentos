@@ -67,6 +67,32 @@ describe('App', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  it('creates the first portfolio with authentication and updates the empty dashboard', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(new Response(JSON.stringify({ accessToken: 'access-token', expiresIn: 900, refreshToken: 'refresh-token' }), { status: 200 }))
+      if (url === '/v1/portfolios' && init?.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ id: 'portfolio-1', name: 'Reserva segura' }), { status: 201 }))
+      return Promise.resolve(new Response(JSON.stringify({ items: [], totalElements: 0 }), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'investidor@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'segredo-forte' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Criar carteira' }))
+    fireEvent.change(screen.getByLabelText('Nome da carteira'), { target: { value: '  Reserva segura  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar carteira' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/v1/portfolios', expect.objectContaining({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer access-token' },
+      body: JSON.stringify({ name: 'Reserva segura' }),
+    })))
+    expect((await screen.findAllByText('Reserva segura')).length).toBeGreaterThan(0)
+    expect(screen.getByText('1')).toBeInTheDocument()
+  })
+
   it('switches between owned portfolios and reloads their details', async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = input.toString()

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { OperationForm } from '../transactions/OperationForm'
+import { PortfolioForm } from '../portfolios/PortfolioForm'
 import { loadDashboard, loadPortfolioDetails, type Asset, type Portfolio, type Position, type Transaction } from './dashboardApi'
 
 type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; assets: Map<string, Asset> }
@@ -15,6 +16,7 @@ export function DashboardPage() {
   const [portfolioError, setPortfolioError] = useState<string | null>(null)
   const [isSwitchingPortfolio, setIsSwitchingPortfolio] = useState(false)
   const [showOperationForm, setShowOperationForm] = useState(false)
+  const [showPortfolioForm, setShowPortfolioForm] = useState(false)
   const portfolioRequest = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -62,6 +64,18 @@ export function DashboardPage() {
     setShowOperationForm(false)
   }
 
+  function portfolioCreated(portfolio: Portfolio) {
+    setData((current) => current ? {
+      ...current,
+      portfolios: [...current.portfolios, portfolio],
+      totalPortfolios: current.totalPortfolios + 1,
+      selectedPortfolio: portfolio,
+      positions: [],
+      transactions: [],
+    } : current)
+    setShowPortfolioForm(false)
+  }
+
   if (error) return <div className="dashboard"><section className="panel status-panel" role="alert"><h1>Não foi possível carregar o painel</h1><p>{error}</p></section></div>
   if (!data) return <div className="dashboard"><section className="panel status-panel" aria-live="polite"><h1>Carregando seu painel…</h1><p>Consultando carteiras e posições com segurança.</p></section></div>
 
@@ -69,13 +83,14 @@ export function DashboardPage() {
     <div className="dashboard">
       <section className="hero-row">
         <div><span className="eyebrow">VISÃO GERAL</span><h1>Seu patrimônio, com clareza.</h1><p>Posições calculadas diretamente do histórico de compras e vendas.</p></div>
-        <div className="hero-actions">{data.selectedPortfolio && data.assets.size > 0 && <button className="primary-button" type="button" onClick={() => setShowOperationForm(true)}>+ Nova operação</button>}{data.portfolios.length > 1 && <label className="portfolio-selector">Carteira
+        <div className="hero-actions"><button className="secondary-button" type="button" onClick={() => setShowPortfolioForm(true)}>+ Nova carteira</button>{data.selectedPortfolio && data.assets.size > 0 && <button className="primary-button" type="button" onClick={() => setShowOperationForm(true)}>+ Nova operação</button>}{data.portfolios.length > 1 && <label className="portfolio-selector">Carteira
           <select value={data.selectedPortfolio?.id ?? ''} disabled={isSwitchingPortfolio} onChange={(event) => void selectPortfolio(event.target.value)}>
             {data.portfolios.map((portfolio) => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}
           </select>
         </label>}</div>
       </section>
       {portfolioError && <div className="inline-error" role="alert">{portfolioError}</div>}
+      {showPortfolioForm && session && <PortfolioForm accessToken={session.accessToken} onCancel={() => setShowPortfolioForm(false)} onCreated={portfolioCreated} />}
       {showOperationForm && session && data.selectedPortfolio && <OperationForm accessToken={session.accessToken} portfolio={data.selectedPortfolio} assets={[...data.assets.values()]} onCancel={() => setShowOperationForm(false)} onCreated={refreshSelectedPortfolio} />}
       <section className="summary-grid" aria-label="Resumo da carteira">
         <article className="summary-card"><span>Carteira selecionada</span><strong>{data.selectedPortfolio?.name ?? '—'}</strong><small>{isSwitchingPortfolio ? 'Atualizando posições…' : 'Dados reais da carteira'}</small></article>
@@ -89,6 +104,7 @@ export function DashboardPage() {
             <div className="empty-state"><span className="empty-icon" aria-hidden="true">↗</span>
               <h3>{data.portfolios.length === 0 ? 'Crie sua primeira carteira' : 'Comece pela primeira operação'}</h3>
               <p>{data.portfolios.length === 0 ? 'Uma carteira organiza suas operações e posições.' : 'Registre uma compra para visualizar quantidade, custo e preço médio.'}</p>
+              {data.portfolios.length === 0 && !showPortfolioForm && <button className="secondary-button" type="button" onClick={() => setShowPortfolioForm(true)}>Criar carteira</button>}
             </div>
           ) : (
             <div className="position-list" aria-label="Posições abertas">
