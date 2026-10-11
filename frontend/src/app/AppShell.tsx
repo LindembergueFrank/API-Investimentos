@@ -1,8 +1,11 @@
 import type { PropsWithChildren } from 'react'
+import { useAuth } from '../features/auth/AuthContext'
 
 const navigation = ['Visão geral', 'Carteiras', 'Ativos', 'Operações']
 
 export function AppShell({ children }: PropsWithChildren) {
+  const { logout } = useAuth()
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -24,7 +27,7 @@ export function AppShell({ children }: PropsWithChildren) {
         </nav>
         <div className="sidebar-footer">
           <span className="avatar" aria-hidden="true">LF</span>
-          <span><strong>Minha conta</strong><small>Perfil do investidor</small></span>
+          <span><strong>Minha conta</strong><button className="logout-button" type="button" onClick={logout}>Sair com segurança</button></span>
         </div>
       </aside>
       <div className="workspace">
