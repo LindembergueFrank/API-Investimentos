@@ -2,7 +2,7 @@ export type Portfolio = { id: string; name: string }
 export type Position = { assetId: string; quantity: number; averagePrice: number; totalCost: number }
 export type Asset = { id: string; market: string; ticker: string; type: string; name: string }
 export type Transaction = { id: string; assetId: string; type: 'BUY' | 'SELL'; quantity: number; unitPrice: number; fees: number; occurredAt: string }
-type ItemPage<T> = { items: T[]; totalElements: number; totalPages?: number }
+type ItemPage<T> = { items: T[]; page?: number; size?: number; totalElements: number; totalPages?: number }
 export type TransactionPage = { content: Transaction[]; page: number; size: number; totalElements: number; totalPages: number }
 
 export type AuthenticatedGet = <T>(path: string, signal?: AbortSignal) => Promise<T>
@@ -44,7 +44,7 @@ async function loadAllItems<T>(path: string, getJson: AuthenticatedGet, signal?:
 export async function loadDashboard(getJson: AuthenticatedGet, signal?: AbortSignal) {
   const [portfolios, assets] = await Promise.all([
     loadAllItems<Portfolio>('/v1/portfolios', getJson, signal),
-    loadAllItems<Asset>('/v1/assets', getJson, signal),
+    getJson<ItemPage<Asset>>('/v1/assets?query=&page=0&size=20', signal),
   ])
   const selectedPortfolio = portfolios.items[0] ?? null
   if (!selectedPortfolio) return { portfolios, assets, positions: [], transactions: [], transactionPage: null, selectedPortfolio }

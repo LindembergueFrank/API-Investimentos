@@ -69,6 +69,10 @@ main { padding: 48px 4.5vw 64px; }
 .operation-form input, .operation-form select { width: 100%; padding: 11px 12px; border: 1px solid #dce2ec; border-radius: 10px; color: var(--navy); background: #fbfcfe; }
 .operation-form input:focus, .operation-form select:focus { outline: 3px solid rgb(37 99 235 / 10%); border-color: #7aa4f7; }
 .operation-error, .form-actions { grid-column: 1 / -1; }
+.asset-pagination { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.asset-pagination button { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--navy); background: #fff; font-weight: 700; }
+.asset-pagination button:disabled { cursor: not-allowed; opacity: .5; }
+.asset-pagination span { color: var(--muted); font-size: 12px; text-align: center; }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .secondary-button { padding: 11px 16px; color: #1f55c7; background: #edf3ff; }
 .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
