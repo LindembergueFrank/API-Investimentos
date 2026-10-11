@@ -26,7 +26,7 @@ class FrontendCorsIntegrationTest {
                         .header("Access-Control-Request-Headers", "Authorization"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", "https://app.example.com"))
-                .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
 
         mockMvc.perform(options("/v1/portfolios")
                         .header("Origin", "https://hostile.example")

@@ -21,7 +21,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private static final Set<String> PROTECTED_PATHS = Set.of(
             "/v1/auth/token",
             "/v1/auth/refresh",
-            "/v1/auth/revoke"
+            "/v1/auth/revoke",
+            "/v1/auth/browser/token",
+            "/v1/auth/browser/refresh",
+            "/v1/auth/browser/revoke"
     );
 
     private final AuthRequestRateLimiter rateLimiter;

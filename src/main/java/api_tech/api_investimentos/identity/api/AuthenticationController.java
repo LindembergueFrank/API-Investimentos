@@ -14,7 +14,9 @@ import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/auth")
 @Tag(name = "Authentication", description = "Emissão de credenciais de acesso")
 public class AuthenticationController {
+
+    static final String REFRESH_COOKIE = "__Host-api-investimentos-refresh";
 
     private final AuthenticationService authenticationService;
 
@@ -56,6 +60,14 @@ public class AuthenticationController {
                 .body(AccessTokenResponse.from(session));
     }
 
+    @PostMapping("/browser/token")
+    @SecurityRequirements
+    @Operation(summary = "Autentica um navegador com refresh token protegido por cookie")
+    public ResponseEntity<BrowserSessionResponse> authenticateBrowser(@Valid @RequestBody LoginRequest request) {
+        var session = authenticationService.authenticate(new AuthenticateUserCommand(request.email(), request.password()));
+        return browserSession(session);
+    }
+
     @PostMapping("/refresh")
     @SecurityRequirements
     @Operation(summary = "Renova uma sessão e rotaciona o refresh token")
@@ -81,6 +93,15 @@ public class AuthenticationController {
                 .body(AccessTokenResponse.from(session));
     }
 
+    @PostMapping("/browser/refresh")
+    @SecurityRequirements
+    @Operation(summary = "Renova uma sessão de navegador e rotaciona o cookie de refresh")
+    public ResponseEntity<BrowserSessionResponse> refreshBrowser(
+            @CookieValue(name = REFRESH_COOKIE) String refreshToken
+    ) {
+        return browserSession(authenticationService.refresh(refreshToken));
+    }
+
     @PostMapping("/revoke")
     @SecurityRequirements
     @Operation(summary = "Revoga uma família de refresh tokens")
@@ -98,6 +119,49 @@ public class AuthenticationController {
         return ResponseEntity.noContent()
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.PRAGMA, "no-cache")
+                .build();
+    }
+
+    @PostMapping("/browser/revoke")
+    @SecurityRequirements
+    @Operation(summary = "Revoga e remove a sessão persistente do navegador")
+    public ResponseEntity<Void> revokeBrowser(
+            @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken
+    ) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            authenticationService.revoke(refreshToken);
+        }
+        return ResponseEntity.noContent()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .header(HttpHeaders.SET_COOKIE, clearRefreshCookie().toString())
+                .build();
+    }
+
+    private ResponseEntity<BrowserSessionResponse> browserSession(
+            api_tech.api_investimentos.identity.application.AuthenticatedSession session
+    ) {
+        var refreshCookie = ResponseCookie.from(REFRESH_COOKIE, session.refreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Strict")
+                .path("/")
+                .maxAge(session.refreshTokenExpiresInSeconds())
+                .build();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .body(BrowserSessionResponse.from(session));
+    }
+
+    private static ResponseCookie clearRefreshCookie() {
+        return ResponseCookie.from(REFRESH_COOKIE, "")
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Strict")
+                .path("/")
+                .maxAge(0)
                 .build();
     }
 }
