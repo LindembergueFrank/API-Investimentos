@@ -29,6 +29,9 @@ jobs:
       - name: Measure position calculation
         run: bash ./mvnw -B -Dtest=PositionCalculatorBenchmark test
 
+      - name: Measure position read path
+        run: bash ./mvnw -B -Dtest=PositionReadPathBenchmark test
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
