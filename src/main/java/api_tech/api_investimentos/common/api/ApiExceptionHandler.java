@@ -1,6 +1,7 @@
 package api_tech.api_investimentos.common.api;
 
 import api_tech.api_investimentos.asset.application.AssetAlreadyExistsException;
+import api_tech.api_investimentos.asset.application.InvalidAssetSearchException;
 import api_tech.api_investimentos.identity.application.InvalidCredentialsException;
 import api_tech.api_investimentos.identity.application.InvalidRefreshTokenException;
 import api_tech.api_investimentos.identity.application.UserNotFoundException;
@@ -132,6 +133,20 @@ public class ApiExceptionHandler {
                 request
         );
         return response(problem);
+    }
+
+    @ExceptionHandler(InvalidAssetSearchException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidAssetSearch(
+            InvalidAssetSearchException exception,
+            WebRequest request
+    ) {
+        return response(problem(
+                HttpStatus.BAD_REQUEST,
+                INVALID_PARAMETER,
+                "Invalid request parameter",
+                exception.getMessage(),
+                request
+        ));
     }
 
     @ExceptionHandler(AssetAlreadyExistsException.class)

@@ -71,6 +71,41 @@ class AssetCatalogIntegrationTest {
                 .andExpect(jsonPath("$.title").value("Resource conflict"));
     }
 
+    @Test
+    void shouldSearchCatalogByTickerOrNameWithServerSidePagination() throws Exception {
+        var user = registerAndLogin("search-user", false);
+        var admin = registerAndLogin("search-admin", true);
+        create(admin, new CreateAssetRequest(AssetMarket.B3, "PETR4", AssetType.STOCK, "Petróleo Brasileiro"));
+        create(admin, new CreateAssetRequest(AssetMarket.B3, "PETR3", AssetType.STOCK, "Petróleo Brasileiro ON"));
+        create(admin, new CreateAssetRequest(AssetMarket.B3, "VALE3", AssetType.STOCK, "Vale"));
+
+        mockMvc.perform(get("/v1/assets").header("Authorization", bearer(user))
+                        .param("query", "  petr  ").param("page", "1").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].ticker").value("PETR4"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        mockMvc.perform(get("/v1/assets").header("Authorization", bearer(user))
+                        .param("query", "vale"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].ticker").value("VALE3"));
+    }
+
+    @Test
+    void shouldRejectOversizedCatalogSearch() throws Exception {
+        var user = registerAndLogin("search-limit-user", false);
+
+        mockMvc.perform(get("/v1/assets").header("Authorization", bearer(user))
+                        .param("query", "a".repeat(81)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
     private void create(String token, CreateAssetRequest request) throws Exception {
         mockMvc.perform(post("/v1/assets").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
