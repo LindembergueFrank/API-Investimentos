@@ -26,6 +26,9 @@ jobs:
       - name: Run tests
         run: bash ./mvnw -B test
 
+      - name: Measure position calculation
+        run: bash ./mvnw -B -Dtest=PositionCalculatorBenchmark test
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
