@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+import { postAuthenticatedJson } from '../../shared/api/http'
 import { AuthProvider, useAuth } from './AuthContext'
 
 function Harness() {
@@ -13,6 +15,28 @@ function Harness() {
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+function SafeRequestHarness() {
+  const { login, getJson } = useAuth()
+  const [result, setResult] = useState('idle')
+  async function loadConcurrently() {
+    try {
+      const values = await Promise.all([
+        getJson<{ value: string }>('/v1/protected/a'),
+        getJson<{ value: string }>('/v1/protected/b'),
+      ])
+      setResult(values.map((item) => item.value).join(','))
+    } catch (cause) {
+      setResult(cause instanceof Error ? cause.message : 'failed')
+    }
+  }
+
+  return <div>
+    <span>{result}</span>
+    <button type="button" onClick={() => login('user@example.com', 'safe-password')}>login-safe</button>
+    <button type="button" onClick={() => void loadConcurrently()}>load-safe</button>
+  </div>
 }
 
 describe('AuthProvider session lifecycle', () => {
@@ -130,4 +154,35 @@ describe('AuthProvider session lifecycle', () => {
     expect(screen.getByText('access-2')).toBeInTheDocument()
     expect(screen.queryByText('stale-access')).not.toBeInTheDocument()
   })
+
+  it('shares one refresh across concurrent safe requests and retries each once', async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString()
+      if (url === '/v1/auth/token') return Promise.resolve(response({ accessToken: 'access-1', expiresIn: 900, refreshToken: 'refresh-1' }))
+      if (url === '/v1/auth/refresh') return Promise.resolve(response({ accessToken: 'access-2', expiresIn: 900, refreshToken: 'refresh-2' }))
+      const authorization = (init?.headers as Record<string, string>)?.Authorization
+      if (authorization === 'Bearer access-1') return Promise.resolve(response({ detail: 'Sessão expirada.' }, 401))
+      return Promise.resolve(response({ value: url.endsWith('/a') ? 'a' : 'b' }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<AuthProvider><SafeRequestHarness /></AuthProvider>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'login-safe' }))
+    await act(async () => { await Promise.resolve() })
+    fireEvent.click(screen.getByRole('button', { name: 'load-safe' }))
+
+    expect(await screen.findByText('a,b')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/v1/auth/refresh')).toHaveLength(1)
+    expect(fetchMock.mock.calls.filter(([, init]) => (init?.headers as Record<string, string>)?.Authorization === 'Bearer access-2')).toHaveLength(2)
+  })
+
+  it('does not retry an unsafe authenticated POST after a 401', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ detail: 'Sessão expirada.' }, 401))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(postAuthenticatedJson('/v1/transactions', { requestId: 'stable-id' }, 'expired-access'))
+      .rejects.toThrow('Sessão expirada.')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
 })

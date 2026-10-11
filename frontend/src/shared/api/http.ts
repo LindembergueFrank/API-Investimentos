@@ -4,6 +4,8 @@ export type ProblemDetail = {
   status?: number
 }
 
+export type RenewAccessToken = (rejectedAccessToken: string) => Promise<string | null>
+
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
 async function readProblem(response: Response, fallback: string) {
@@ -11,11 +13,25 @@ async function readProblem(response: Response, fallback: string) {
   return problem?.detail || problem?.title || fallback
 }
 
-export async function getJson<T>(path: string, accessToken: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+function authenticatedGet(path: string, accessToken: string, signal?: AbortSignal) {
+  return fetch(`${apiBaseUrl}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     signal,
   })
+}
+
+export async function getJson<T>(path: string, accessToken: string, signal?: AbortSignal): Promise<T> {
+  const response = await authenticatedGet(path, accessToken, signal)
+  if (!response.ok) throw new Error(await readProblem(response, 'Não foi possível carregar os dados.'))
+  return response.json() as Promise<T>
+}
+
+export async function getJsonWithRefresh<T>(path: string, accessToken: string, renew: RenewAccessToken, signal?: AbortSignal): Promise<T> {
+  let response = await authenticatedGet(path, accessToken, signal)
+  if (response.status === 401) {
+    const renewedAccessToken = await renew(accessToken)
+    if (renewedAccessToken) response = await authenticatedGet(path, renewedAccessToken, signal)
+  }
   if (!response.ok) throw new Error(await readProblem(response, 'Não foi possível carregar os dados.'))
   return response.json() as Promise<T>
 }
