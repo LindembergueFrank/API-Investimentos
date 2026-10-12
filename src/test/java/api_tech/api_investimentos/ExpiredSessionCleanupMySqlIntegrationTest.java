@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -54,9 +55,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class ExpiredSessionCleanupMySqlIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-09-27T20:00:00Z");
+    private static final String MYSQL_IMAGE =
+            "mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242";
 
     @Container
-    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
+    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>(
+            DockerImageName.parse(MYSQL_IMAGE).asCompatibleSubstituteFor("mysql"))
             .withDatabaseName("apiinvestimentos")
             .withUsername("test")
             .withPassword("test");
