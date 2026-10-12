@@ -24,13 +24,13 @@ jobs:
           cache: maven
 
       - name: Run tests
-        run: bash ./mvnw -B test
+        run: ./mvnw -B test
 
       - name: Measure position calculation
-        run: bash ./mvnw -B -Dtest=PositionCalculatorBenchmark test
+        run: ./mvnw -B -Dtest=PositionCalculatorBenchmark test
 
       - name: Measure position read path
-        run: bash ./mvnw -B -Dtest=PositionReadPathBenchmark test
+        run: ./mvnw -B -Dtest=PositionReadPathBenchmark test
 
   frontend:
     runs-on: ubuntu-latest
