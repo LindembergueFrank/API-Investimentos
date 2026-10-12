@@ -4,7 +4,7 @@ API REST em evolução para servir como base de um agregador de investimentos, d
 
 O escopo implementado inclui gerenciamento de usuários, carteiras isoladas por proprietário e um catálogo controlado de ativos. Operações, cotações e cálculo de rentabilidade permanecem evoluções posteriores.
 
-A base utiliza Spring Boot 3.3.2 e é desenvolvida com foco em segurança, testes, configuração por ambiente e práticas de engenharia de software.
+A base utiliza Spring Boot 3.5.16 e é desenvolvida com foco em segurança, testes, configuração por ambiente e práticas de engenharia de software.
 
 ## Estado atual
 
@@ -28,12 +28,19 @@ A API implementa identidade segura e o primeiro recorte do domínio de carteiras
 
 ## Documentação da API
 
-Com a aplicação em execução, o contrato OpenAPI e a interface Swagger UI ficam disponíveis em:
+Por segurança, o contrato OpenAPI e a interface Swagger UI ficam desabilitados por padrão. Para habilitá-los explicitamente em um ambiente local ou controlado, defina:
+
+```bash
+SPRINGDOC_API_DOCS_ENABLED=true
+SPRINGDOC_SWAGGER_UI_ENABLED=true
+```
+
+Com a aplicação em execução, ficam disponíveis em:
 
 - `http://localhost:8080/v3/api-docs` — especificação OpenAPI em JSON;
 - `http://localhost:8080/swagger-ui.html` — documentação interativa.
 
-Os endpoints documentam payloads, validações, códigos de resposta e erros no formato Problem Details (RFC 9457). Exemplos usam somente dados fictícios.
+Não habilite a interface em ambiente público sem uma decisão operacional explícita e controles de acesso adequados. Os testes de contrato habilitam a documentação isoladamente. Os endpoints documentam payloads, validações, códigos de resposta e erros no formato Problem Details (RFC 9457). Exemplos usam somente dados fictícios.
 
 ## Segurança aplicada
 
