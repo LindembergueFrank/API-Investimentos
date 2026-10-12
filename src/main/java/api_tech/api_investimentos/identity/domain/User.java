@@ -2,7 +2,9 @@ package api_tech.api_investimentos.identity.domain;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -11,6 +13,7 @@ import java.util.UUID;
 @Table(name = "tb_user")
 public class User {
     @Id
+    @JdbcTypeCode(SqlTypes.BINARY)
     private UUID id;
 
     @Column(name = "username", nullable = false, length = 50)

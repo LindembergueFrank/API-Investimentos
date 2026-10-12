@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -21,11 +23,14 @@ import java.util.UUID;
 public class RefreshToken {
 
     @Id
+    @JdbcTypeCode(SqlTypes.BINARY)
     private UUID id;
 
+    @JdbcTypeCode(SqlTypes.BINARY)
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @JdbcTypeCode(SqlTypes.BINARY)
     @Column(name = "family_id", nullable = false)
     private UUID familyId;
 
