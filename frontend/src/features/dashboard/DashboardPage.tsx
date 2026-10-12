@@ -4,9 +4,9 @@ import { AssetForm } from '../assets/AssetForm'
 import type { AssetPage } from '../assets/assetApi'
 import { OperationForm } from '../transactions/OperationForm'
 import { PortfolioForm } from '../portfolios/PortfolioForm'
-import { loadDashboard, loadPortfolioDetails, loadTransactionPage, type Asset, type Portfolio, type Position, type Transaction, type TransactionPage } from './dashboardApi'
+import { loadDashboard, loadPortfolioDetails, loadPortfolioPage, loadTransactionPage, type Asset, type Portfolio, type PortfolioPage, type Position, type Transaction, type TransactionPage } from './dashboardApi'
 
-type DashboardData = { portfolios: Portfolio[]; totalPortfolios: number; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; transactionPage: TransactionPage | null; assets: Map<string, Asset>; assetPage: AssetPage }
+type DashboardData = { portfolios: Portfolio[]; portfolioPage: PortfolioPage; selectedPortfolio: Portfolio | null; positions: Position[]; transactions: Transaction[]; transactionPage: TransactionPage | null; assets: Map<string, Asset>; assetPage: AssetPage }
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const decimal = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 8 })
 const date = new Intl.DateTimeFormat('pt-BR')
@@ -17,6 +17,7 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [portfolioError, setPortfolioError] = useState<string | null>(null)
   const [isSwitchingPortfolio, setIsSwitchingPortfolio] = useState(false)
+  const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(false)
   const [showOperationForm, setShowOperationForm] = useState(false)
   const [showPortfolioForm, setShowPortfolioForm] = useState(false)
   const [showAssetForm, setShowAssetForm] = useState(false)
@@ -30,7 +31,7 @@ export function DashboardPage() {
     setError(null)
     loadDashboard(getJson, controller.signal)
       .then(({ portfolios, positions, transactions, transactionPage, assets, selectedPortfolio }) => setData({
-        portfolios: portfolios.items, totalPortfolios: portfolios.totalElements, selectedPortfolio, positions, transactions, transactionPage,
+        portfolios: portfolios.items, portfolioPage: portfolios, selectedPortfolio, positions, transactions, transactionPage,
         assets: new Map(assets.items.map((asset) => [asset.id, asset])),
         assetPage: { items: assets.items, page: assets.page ?? 0, size: assets.size ?? 20, totalElements: assets.totalElements, totalPages: assets.totalPages ?? Math.ceil(assets.totalElements / 20) },
       }))
@@ -75,11 +76,36 @@ export function DashboardPage() {
     setShowOperationForm(false)
   }
 
+  async function selectPortfolioPage(page: number) {
+    if (!data || page < 0 || page >= data.portfolioPage.totalPages || page === data.portfolioPage.page) return
+    portfolioRequest.current?.abort()
+    const controller = new AbortController()
+    portfolioRequest.current = controller
+    setIsLoadingPortfolios(true)
+    setPortfolioError(null)
+    try {
+      const portfolioPage = await loadPortfolioPage(page, getJson, controller.signal)
+      const selectedPortfolio = portfolioPage.items[0] ?? null
+      const details = selectedPortfolio
+        ? await loadPortfolioDetails(selectedPortfolio.id, getJson, controller.signal)
+        : { positions: [], transactions: [], transactionPage: null }
+      setData((current) => current ? { ...current, portfolios: portfolioPage.items, portfolioPage, selectedPortfolio, ...details } : current)
+    } catch (cause: unknown) {
+      if (!controller.signal.aborted) setPortfolioError(cause instanceof Error ? cause.message : 'Não foi possível carregar as carteiras.')
+    } finally {
+      if (portfolioRequest.current === controller) setIsLoadingPortfolios(false)
+    }
+  }
+
   function portfolioCreated(portfolio: Portfolio) {
     setData((current) => current ? {
       ...current,
       portfolios: [...current.portfolios, portfolio],
-      totalPortfolios: current.totalPortfolios + 1,
+      portfolioPage: {
+        ...current.portfolioPage,
+        totalElements: current.portfolioPage.totalElements + 1,
+        totalPages: Math.ceil((current.portfolioPage.totalElements + 1) / current.portfolioPage.size),
+      },
       selectedPortfolio: portfolio,
       positions: [],
       transactions: [],
@@ -119,12 +145,17 @@ export function DashboardPage() {
     <div className="dashboard">
       <section className="hero-row">
         <div><span className="eyebrow">VISÃO GERAL</span><h1>Seu patrimônio, com clareza.</h1><p>Posições calculadas diretamente do histórico de compras e vendas.</p></div>
-        <div className="hero-actions">{session?.roles.includes('ADMIN') && <button className="secondary-button" type="button" onClick={() => setShowAssetForm(true)}>+ Novo ativo</button>}<button className="secondary-button" type="button" onClick={() => setShowPortfolioForm(true)}>+ Nova carteira</button>{data.selectedPortfolio && data.assets.size > 0 && <button className="primary-button" type="button" onClick={() => setShowOperationForm(true)}>+ Nova operação</button>}{data.portfolios.length > 1 && <label className="portfolio-selector">Carteira
-          <select value={data.selectedPortfolio?.id ?? ''} disabled={isSwitchingPortfolio} onChange={(event) => void selectPortfolio(event.target.value)}>
+        <div className="hero-actions">{session?.roles.includes('ADMIN') && <button className="secondary-button" type="button" onClick={() => setShowAssetForm(true)}>+ Novo ativo</button>}<button className="secondary-button" type="button" onClick={() => setShowPortfolioForm(true)}>+ Nova carteira</button>{data.selectedPortfolio && data.assets.size > 0 && <button className="primary-button" type="button" onClick={() => setShowOperationForm(true)}>+ Nova operação</button>}{data.portfolioPage.totalElements > 1 && <label className="portfolio-selector">Carteira
+          <select value={data.selectedPortfolio?.id ?? ''} disabled={isSwitchingPortfolio || isLoadingPortfolios} onChange={(event) => void selectPortfolio(event.target.value)}>
             {data.portfolios.map((portfolio) => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}
           </select>
         </label>}</div>
       </section>
+      {data.portfolioPage.totalPages > 1 && <nav className="history-pagination portfolio-pagination" aria-label="Paginação das carteiras">
+        <button type="button" disabled={isLoadingPortfolios || data.portfolioPage.page === 0} onClick={() => void selectPortfolioPage(data.portfolioPage.page - 1)}>Carteiras anteriores</button>
+        <span aria-live="polite">Página {data.portfolioPage.page + 1} de {data.portfolioPage.totalPages}</span>
+        <button type="button" disabled={isLoadingPortfolios || data.portfolioPage.page + 1 >= data.portfolioPage.totalPages} onClick={() => void selectPortfolioPage(data.portfolioPage.page + 1)}>Próximas carteiras</button>
+      </nav>}
       {portfolioError && <div className="inline-error" role="alert">{portfolioError}</div>}
       {showPortfolioForm && session && <PortfolioForm accessToken={session.accessToken} onCancel={() => setShowPortfolioForm(false)} onCreated={portfolioCreated} />}
       {showAssetForm && session?.roles.includes('ADMIN') && <AssetForm accessToken={session.accessToken} onCancel={() => setShowAssetForm(false)} onCreated={assetCreated} />}
@@ -132,7 +163,7 @@ export function DashboardPage() {
       <section className="summary-grid" aria-label="Resumo da carteira">
         <article className="summary-card"><span>Carteira selecionada</span><strong>{data.selectedPortfolio?.name ?? '—'}</strong><small>{isSwitchingPortfolio ? 'Atualizando posições…' : 'Dados reais da carteira'}</small></article>
         <article className="summary-card"><span>Posições abertas</span><strong>{data.positions.length}</strong><small>{data.selectedPortfolio?.name ?? 'Nenhuma carteira'}</small></article>
-        <article className="summary-card"><span>Carteiras</span><strong>{data.totalPortfolios}</strong><small>Vinculadas à sua conta</small></article>
+        <article className="summary-card"><span>Carteiras</span><strong>{data.portfolioPage.totalElements}</strong><small>Vinculadas à sua conta</small></article>
       </section>
       <section className="content-grid">
         <article className="panel positions-panel">
