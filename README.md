@@ -2,13 +2,13 @@
 
 API REST em evolução para servir como base de um agregador de investimentos, desenvolvida com **Java 21, Spring Boot, JPA/Hibernate e MySQL**.
 
-O escopo implementado inclui gerenciamento de usuários, carteiras isoladas por proprietário e um catálogo controlado de ativos. Operações, cotações e cálculo de rentabilidade permanecem evoluções posteriores.
+O escopo implementado inclui identidade, carteiras isoladas por proprietário, catálogo controlado de ativos, operações idempotentes, posições derivadas do livro e um cliente React/TypeScript integrado. Cotações, gráficos e rentabilidade não são expostos porque ainda não existe um contrato backend real para esses dados.
 
 A base utiliza Spring Boot 3.5.16 e é desenvolvida com foco em segurança, testes, configuração por ambiente e práticas de engenharia de software.
 
 ## Estado atual
 
-A API implementa identidade segura e o primeiro recorte do domínio de carteiras.
+A aplicação implementa o fluxo autenticado de identidade, carteiras, ativos, operações e posições, com isolamento por proprietário e precisão financeira.
 
 | Método | Endpoint | Descrição |
 | --- | --- | --- |
@@ -64,7 +64,8 @@ Não habilite a interface em ambiente público sem uma decisão operacional expl
 - posições são derivadas na ordem monotônica do livro; taxas de compra compõem o custo e vendas não alteram o preço médio remanescente;
 - o contrato de posições documenta explicitamente schemas de sucesso, autenticação e recurso não encontrado no OpenAPI;
 - CORS permanece fechado por padrão e aceita somente origens HTTP(S) exatas configuradas em `API_CORS_ALLOWED_ORIGINS`;
-- o frontend React/TypeScript inicia com shell responsivo, estado vazio honesto e módulos organizados por funcionalidade;
+- o frontend React/TypeScript consome carteiras, ativos, operações e posições reais, com renovação HTTP coordenada, estados explícitos e módulos organizados por funcionalidade;
+- OpenAPI e Swagger UI permanecem desabilitados por padrão e só são publicados quando o ambiente os habilita explicitamente;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
 - credenciais de banco não ficam versionadas;
@@ -202,19 +203,16 @@ O mesmo comando é executado automaticamente pelo GitHub Actions em pushes e pul
 
 ```text
 src/main/java/api_tech/api_investimentos/
-├── common/api/               # contrato comum de erros HTTP
+├── common/                   # contrato comum de erros HTTP
 ├── config/                   # configurações técnicas compartilhadas
-├── identity/
-    ├── api/                  # controllers e DTOs HTTP
-    ├── application/          # casos de uso, comandos e portas
-    ├── domain/               # modelo de identidade
-    └── infrastructure/       # adaptadores de persistência
-├── portfolio/                # mesmas fronteiras para carteiras do usuário
+├── identity/                 # usuários, autenticação e sessão
+├── portfolio/                # carteiras isoladas por proprietário
 ├── asset/                    # catálogo controlado de ativos
-└── transaction/              # compras, vendas e consulta paginada de operações
+├── transaction/              # compras, vendas e histórico paginado
+└── position/                 # cálculo derivado de quantidade e preço médio
 ```
 
-O frontend fica em `frontend/`, separado por funcionalidades (`app`, `dashboard` e `shared`). Para executá-lo:
+O frontend fica em `frontend/`, com infraestrutura compartilhada e funcionalidades separadas em `auth`, `dashboard`, `portfolios`, `assets` e `transactions`. Para executá-lo:
 
 ```bash
 cd frontend
@@ -230,10 +228,11 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. posição e preço médio derivados das operações;
-2. rentabilidade e integração com cotações;
-3. frontend integrado ao contrato OpenAPI;
-4. verificação de e-mail, recuperação de senha e observabilidade.
+1. avaliar sessão durável com cookie `HttpOnly`, `Secure` e `SameSite`, incluindo modelo de CSRF e testes de rotação;
+2. substituir cargas integrais de catálogos por busca e paginação server-side orientadas pela interface;
+3. continuar medindo o custo do cálculo integral de posições antes de decidir por snapshot ou projeção;
+4. implementar verificação de e-mail, recuperação de senha e observabilidade;
+5. definir fonte e contrato backend de cotações antes de iniciar rentabilidade, gráficos ou qualquer dado financeiro de mercado.
 
 ## Princípios de contribuição
 
