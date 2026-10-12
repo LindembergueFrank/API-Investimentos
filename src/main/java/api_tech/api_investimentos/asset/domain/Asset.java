@@ -7,6 +7,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -15,6 +17,7 @@ import java.util.UUID;
 @Table(name = "asset")
 public class Asset {
     @Id
+    @JdbcTypeCode(SqlTypes.BINARY)
     private UUID id;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)

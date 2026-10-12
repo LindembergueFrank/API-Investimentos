@@ -7,6 +7,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,10 +17,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "investment_transaction")
 public class InvestmentTransaction {
-    @Id private UUID id;
-    @Column(name = "request_id", nullable = false) private UUID requestId;
-    @Column(name = "portfolio_id", nullable = false) private UUID portfolioId;
-    @Column(name = "asset_id", nullable = false) private UUID assetId;
+    @Id @JdbcTypeCode(SqlTypes.BINARY) private UUID id;
+    @JdbcTypeCode(SqlTypes.BINARY) @Column(name = "request_id", nullable = false) private UUID requestId;
+    @JdbcTypeCode(SqlTypes.BINARY) @Column(name = "portfolio_id", nullable = false) private UUID portfolioId;
+    @JdbcTypeCode(SqlTypes.BINARY) @Column(name = "asset_id", nullable = false) private UUID assetId;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 4) private TransactionType type;
     @Column(nullable = false, precision = 19, scale = 8) private BigDecimal quantity;
     @Column(name = "unit_price", nullable = false, precision = 19, scale = 8) private BigDecimal unitPrice;
