@@ -228,10 +228,10 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. substituir cargas integrais de catálogos por busca e paginação server-side orientadas pela interface;
-2. continuar medindo o custo do cálculo integral de posições antes de decidir por snapshot ou projeção;
-3. implementar verificação de e-mail, recuperação de senha e observabilidade;
-4. definir fonte e contrato backend de cotações antes de iniciar rentabilidade, gráficos ou qualquer dado financeiro de mercado.
+1. implementar verificação de e-mail, recuperação de senha e observabilidade;
+2. definir fonte e contrato backend de cotações antes de iniciar rentabilidade, gráficos ou qualquer dado financeiro de mercado.
+
+A busca e a paginação server-side já substituem cargas integrais nos catálogos e na seleção de carteiras. A posição continua calculada sob demanda: a [decisão arquitetural](docs/decisions/0001-position-calculation.md) registra as medições atuais, os limites da evidência e os gatilhos para reavaliar snapshot ou projeção.
 
 ## Princípios de contribuição
 
