@@ -220,7 +220,7 @@ npm ci
 npm run dev
 ```
 
-Por segurança, tokens de acesso e renovação ficam somente em memória: recarregar ou fechar a aba encerra a sessão local. A URL da API pode ser definida por `VITE_API_BASE_URL`; sem ela, o frontend usa a mesma origem.
+O frontend mantém somente o access token em memória. O refresh token fica em um cookie `__Host-` com `HttpOnly`, `Secure`, `SameSite=Strict` e `Path=/`; ele não é exposto ao JavaScript, é rotacionado a cada renovação e permite restaurar a sessão após recarregar a página. O modelo de CSRF combina `SameSite=Strict`, o prefixo `__Host-` e CORS fechado por padrão; os endpoints de navegador recebem o cookie apenas com `credentials: include`. A URL da API pode ser definida por `VITE_API_BASE_URL`; sem ela, o frontend usa a mesma origem.
 
 Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infraestrutura no mesmo módulo. DTOs HTTP são convertidos em comandos antes de entrar na aplicação, e o serviço depende da porta `UserRepository`, não do Spring Data diretamente.
 
@@ -228,11 +228,10 @@ Cada funcionalidade mantém suas fronteiras de API, aplicação, domínio e infr
 
 Próximas evoluções priorizadas:
 
-1. avaliar sessão durável com cookie `HttpOnly`, `Secure` e `SameSite`, incluindo modelo de CSRF e testes de rotação;
-2. substituir cargas integrais de catálogos por busca e paginação server-side orientadas pela interface;
-3. continuar medindo o custo do cálculo integral de posições antes de decidir por snapshot ou projeção;
-4. implementar verificação de e-mail, recuperação de senha e observabilidade;
-5. definir fonte e contrato backend de cotações antes de iniciar rentabilidade, gráficos ou qualquer dado financeiro de mercado.
+1. substituir cargas integrais de catálogos por busca e paginação server-side orientadas pela interface;
+2. continuar medindo o custo do cálculo integral de posições antes de decidir por snapshot ou projeção;
+3. implementar verificação de e-mail, recuperação de senha e observabilidade;
+4. definir fonte e contrato backend de cotações antes de iniciar rentabilidade, gráficos ou qualquer dado financeiro de mercado.
 
 ## Princípios de contribuição
 
