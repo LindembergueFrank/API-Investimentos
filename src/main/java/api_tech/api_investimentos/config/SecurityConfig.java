@@ -1,5 +1,6 @@
 package api_tech.api_investimentos.config;
 
+import api_tech.api_investimentos.common.infrastructure.CorrelationIdFilter;
 import api_tech.api_investimentos.identity.infrastructure.AuthRateLimitFilter;
 import api_tech.api_investimentos.identity.infrastructure.AuthRequestRateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -114,7 +115,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(properties.allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        configuration.setExposedHeaders(List.of("Location"));
+        configuration.setExposedHeaders(List.of("Location", CorrelationIdFilter.HEADER_NAME));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

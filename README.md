@@ -65,6 +65,7 @@ Não habilite a interface em ambiente público sem uma decisão operacional expl
 - o contrato de posições documenta explicitamente schemas de sucesso, autenticação e recurso não encontrado no OpenAPI;
 - CORS permanece fechado por padrão e aceita somente origens HTTP(S) exatas configuradas em `API_CORS_ALLOWED_ORIGINS`;
 - o frontend React/TypeScript consome carteiras, ativos, operações e posições reais, com renovação HTTP coordenada, estados explícitos e módulos organizados por funcionalidade;
+- cada requisição recebe um UUID gerado pelo servidor em `X-Correlation-Id`; o mesmo valor permanece no contexto de log somente durante a requisição e é exposto ao frontend para suporte sem registrar payloads, tokens ou dados financeiros;
 - OpenAPI e Swagger UI permanecem desabilitados por padrão e só são publicados quando o ambiente os habilita explicitamente;
 - a chave de assinatura é obrigatória e fornecida por variável de ambiente;
 - respostas HTTP utilizam um DTO específico e **nunca retornam o campo de senha**;
