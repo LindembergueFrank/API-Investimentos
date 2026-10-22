@@ -225,7 +225,7 @@ Cobertura será um indicador auxiliar. O critério principal é cobrir riscos e 
 
 A aplicação deverá oferecer:
 
-- health, readiness e liveness checks;
+- health, readiness e liveness checks via Actuator, sem detalhes internos nas sondas públicas;
 - logs estruturados com correlation ID;
 - métricas de erro, latência e importação;
 - perfis separados de desenvolvimento, teste e produção;

@@ -69,6 +69,7 @@ public class SecurityConfig {
                                 "/v1/auth/browser/revoke",
                                 "/v1/users")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
