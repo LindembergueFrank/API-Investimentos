@@ -190,6 +190,16 @@ docker compose up -d
 
 Esse comando remove os dados locais. Para preservar um banco existente, faça backup, confira se o schema corresponde às migrations publicadas e execute a aplicação uma única vez com `FLYWAY_BASELINE_ON_MIGRATE=true`. Depois remova essa variável para que divergências futuras voltem a interromper a inicialização.
 
+## Health checks
+
+A aplicação expõe somente os endpoints operacionais necessários para sondas de infraestrutura:
+
+- `GET /actuator/health/liveness` confirma que o processo está vivo, sem depender do banco;
+- `GET /actuator/health/readiness` confirma que a aplicação e o banco estão prontos para receber tráfego;
+- `GET /actuator/health` apresenta o estado geral.
+
+As sondas não exigem autenticação para permitir integração com plataformas de hospedagem, mas nunca retornam componentes ou detalhes internos. Os demais endpoints do Actuator não são expostos. Respostas também incluem `X-Correlation-Id` para diagnóstico.
+
 ## Testes
 
 A suíte unitária e os testes de integração usam H2 em memória. O teste de contexto executa as migrations versionadas e valida o schema com Hibernate:
