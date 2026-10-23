@@ -26,6 +26,16 @@ class HealthEndpointIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
+    void shouldExposeGeneralHealthWithoutAuthenticationOrInternalDetails() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(ACTUATOR_JSON))
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.components").doesNotExist())
+                .andExpect(header().exists(CorrelationIdFilter.HEADER_NAME));
+    }
+
+    @Test
     void shouldExposeLivenessWithoutAuthenticationOrInternalDetails() throws Exception {
         mockMvc.perform(get("/actuator/health/liveness"))
                 .andExpect(status().isOk())
@@ -48,6 +58,12 @@ class HealthEndpointIntegrationTest {
     @Test
     void shouldNotExposeOtherActuatorEndpointsAnonymously() throws Exception {
         mockMvc.perform(get("/actuator/env"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldNotExposeHealthComponentsAnonymously() throws Exception {
+        mockMvc.perform(get("/actuator/health/db"))
                 .andExpect(status().isUnauthorized());
     }
 }
