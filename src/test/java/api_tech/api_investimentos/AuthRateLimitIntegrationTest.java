@@ -3,6 +3,7 @@ package api_tech.api_investimentos;
 import api_tech.api_investimentos.identity.api.LoginRequest;
 import api_tech.api_investimentos.identity.api.RefreshTokenRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -78,6 +79,47 @@ class AuthRateLimitIntegrationTest {
     }
 
     @Test
+    void shouldBlockBrowserLoginAbuseWithoutIssuingACookieAndIsolateClients() throws Exception {
+        String client = "203.0.113.20";
+        String otherClient = "203.0.113.21";
+        var request = new LoginRequest("missing-browser@example.com", "browser-secret-that-must-not-leak");
+
+        invalidBrowserLogin(client, "192.0.2.10", request);
+        invalidBrowserLogin(client, "192.0.2.11", request);
+
+        mockMvc.perform(from(client, "/v1/auth/browser/token")
+                        .header("X-Forwarded-For", "192.0.2.12")
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(header().string("Retry-After", matchesPattern("[1-9][0-9]*")))
+                .andExpect(header().doesNotExist("Set-Cookie"))
+                .andExpect(jsonPath("$.type")
+                        .value("urn:problem-type:api-investimentos:rate-limit-exceeded"))
+                .andExpect(content().string(not(containsString(request.email()))))
+                .andExpect(content().string(not(containsString(request.password()))));
+
+        invalidBrowserLogin(otherClient, "192.0.2.12", request);
+    }
+
+    @Test
+    void shouldShareTheLimitAcrossAllBrowserSessionEndpoints() throws Exception {
+        String client = "198.51.100.40";
+
+        mockMvc.perform(from(client, "/v1/auth/browser/revoke"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(from(client, "/v1/auth/browser/refresh")
+                        .cookie(new Cookie("__Host-api-investimentos-refresh", "unknown-refresh-token")))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(from(client, "/v1/auth/browser/token")
+                        .content(objectMapper.writeValueAsBytes(
+                                new LoginRequest("missing-browser@example.com", "another-browser-secret"))))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     void shouldApplyTheLimitWhenTheApplicationUsesAContextPath() throws Exception {
         String client = "198.51.100.30";
         var request = new LoginRequest("missing@example.com", "context-path-secret");
@@ -101,6 +143,13 @@ class AuthRateLimitIntegrationTest {
     private void invalidLoginWithContextPath(String client, LoginRequest request) throws Exception {
         mockMvc.perform(from(client, "/investments/v1/auth/token")
                         .contextPath("/investments")
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private void invalidBrowserLogin(String client, String forwardedFor, LoginRequest request) throws Exception {
+        mockMvc.perform(from(client, "/v1/auth/browser/token")
+                        .header("X-Forwarded-For", forwardedFor)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isUnauthorized());
     }
