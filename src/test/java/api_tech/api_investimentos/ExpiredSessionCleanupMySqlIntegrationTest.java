@@ -28,7 +28,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -39,6 +42,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -92,6 +98,9 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
     @Autowired
     private PositionService positionService;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -117,6 +126,40 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
         assertEquals(2, cleanupService.cleanupBatch());
         assertEquals(2, tokenCount());
         assertEquals(0, cleanupService.cleanupBatch());
+    }
+
+    @Test
+    void shouldCleanCommittedExpiredSessionsSafelyUnderConcurrentExecutions() throws Exception {
+        inCommittedTransaction(() -> {
+            UUID userId = saveUser();
+            UUID firstFamily = UUID.randomUUID();
+            saveToken(userId, firstFamily, NOW.minusSeconds(30 * 24 * 60 * 60L));
+            saveToken(userId, firstFamily, NOW.minusSeconds(29 * 24 * 60 * 60L));
+            saveToken(userId, UUID.randomUUID(), NOW.minusSeconds(20 * 24 * 60 * 60L));
+            entityManager.flush();
+        });
+
+        var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+
+        try {
+            var firstCleanup = executor.submit(() -> {
+                start.await();
+                return cleanupService.cleanupBatch();
+            });
+            var secondCleanup = executor.submit(() -> {
+                start.await();
+                return cleanupService.cleanupBatch();
+            });
+
+            start.countDown();
+            assertEquals(3,
+                    firstCleanup.get(15, TimeUnit.SECONDS) + secondCleanup.get(15, TimeUnit.SECONDS));
+            assertEquals(0, tokenCount());
+            assertEquals(0, cleanupService.cleanupBatch());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -221,6 +264,12 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
 
     private int tokenCount() {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_refresh_token", Integer.class);
+    }
+
+    private void inCommittedTransaction(Runnable work) {
+        var transaction = new TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transaction.executeWithoutResult(status -> work.run());
     }
 
     @TestConfiguration
