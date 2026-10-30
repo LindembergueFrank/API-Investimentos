@@ -63,6 +63,11 @@ export function OperationForm({ accessToken, portfolio, assets, initialAssetPage
 
   async function submit(event: FormEvent) {
     event.preventDefault()
+    const selectedAsset = assetPage.items.find((asset) => asset.id === assetId)
+    if (!selectedAsset) {
+      setError('Selecione um ativo válido.')
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
@@ -70,8 +75,6 @@ export function OperationForm({ accessToken, portfolio, assets, initialAssetPage
         requestId, portfolioId: portfolio.id, assetId, type, quantity, unitPrice, fees,
         occurredAt: new Date(occurredAt).toISOString(),
       }, accessToken)
-      const selectedAsset = assetPage.items.find((asset) => asset.id === assetId)
-      if (!selectedAsset) throw new Error('Selecione um ativo válido.')
       await onCreated(selectedAsset)
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível registrar a operação.')
@@ -94,7 +97,7 @@ export function OperationForm({ accessToken, portfolio, assets, initialAssetPage
       {assetPage.totalPages > 1 && <nav className="asset-pagination" aria-label="Paginação dos ativos"><button type="button" disabled={loadingAssets || assetPage.page === 0} onClick={() => setAssetPage((current) => ({ ...current, page: current.page - 1 }))}>Ativos anteriores</button><span aria-live="polite">Página {assetPage.page + 1} de {assetPage.totalPages}</span><button type="button" disabled={loadingAssets || assetPage.page + 1 >= assetPage.totalPages} onClick={() => setAssetPage((current) => ({ ...current, page: current.page + 1 }))}>Próximos ativos</button></nav>}
       {assetError && <p className="form-error operation-error" role="alert">{assetError}</p>}
       {error && <p className="form-error operation-error" role="alert">{error}</p>}
-      <div className="form-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancelar</button><button className="primary-button" type="submit" disabled={submitting}>{submitting ? 'Registrando…' : 'Registrar operação'}</button></div>
+      <div className="form-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancelar</button><button className="primary-button" type="submit" disabled={submitting || !assetPage.items.some((asset) => asset.id === assetId)}>{submitting ? 'Registrando…' : 'Registrar operação'}</button></div>
     </form>
   </section>
 }
