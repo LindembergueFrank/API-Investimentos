@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -91,6 +92,42 @@ class TransactionFlowIntegrationTest {
             assertEquals(List.of(201, 409), statuses);
         }
         assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM investment_transaction WHERE portfolio_id = ?", Integer.class, portfolioId));
+    }
+
+    @Test
+    void shouldScopeIdempotencyKeysToEachOwnedPortfolio() throws Exception {
+        String firstOwner = registerAndLogin("idempotency-first-owner");
+        String secondOwner = registerAndLogin("idempotency-second-owner");
+        UUID firstPortfolio = createPortfolio(firstOwner);
+        UUID secondPortfolio = createPortfolio(secondOwner);
+        UUID assetId = createAsset();
+        UUID sharedRequestId = UUID.randomUUID();
+        Instant occurredAt = Instant.now().minus(1, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MICROS);
+
+        var firstResult = perform(firstOwner,
+                request(sharedRequestId, firstPortfolio, assetId, TransactionType.BUY, "2", occurredAt))
+                .andExpect(status().isCreated())
+                .andReturn();
+        var secondResult = perform(secondOwner,
+                request(sharedRequestId, secondPortfolio, assetId, TransactionType.BUY, "3", occurredAt))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String firstTransactionId = objectMapper.readTree(firstResult.getResponse().getContentAsByteArray())
+                .get("id").asText();
+        String secondTransactionId = objectMapper.readTree(secondResult.getResponse().getContentAsByteArray())
+                .get("id").asText();
+        assertNotEquals(firstTransactionId, secondTransactionId);
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM investment_transaction WHERE request_id = ?",
+                Integer.class,
+                sharedRequestId));
+
+        perform(secondOwner,
+                request(sharedRequestId, firstPortfolio, assetId, TransactionType.BUY, "4", occurredAt))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Resource not found"));
     }
 
     @Test
