@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -92,6 +93,43 @@ class TransactionFlowIntegrationTest {
             assertEquals(List.of(201, 409), statuses);
         }
         assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM investment_transaction WHERE portfolio_id = ?", Integer.class, portfolioId));
+    }
+
+    @Test
+    void shouldPersistOnlyOneTransactionForConcurrentIdenticalRequests() throws Exception {
+        String owner = registerAndLogin("concurrent-replay");
+        UUID portfolioId = createPortfolio(owner);
+        UUID requestId = UUID.randomUUID();
+        var buy = request(requestId, portfolioId, createAsset(), TransactionType.BUY, "2",
+                Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.MICROS));
+
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<org.springframework.mock.web.MockHttpServletResponse> submit = () -> {
+                ready.countDown();
+                if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Start timed out");
+                return perform(owner, buy).andReturn().getResponse();
+            };
+            var first = executor.submit(submit);
+            var second = executor.submit(submit);
+            org.junit.jupiter.api.Assertions.assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            var a = first.get(15, TimeUnit.SECONDS);
+            var b = second.get(15, TimeUnit.SECONDS);
+            assertEquals(List.of(200, 201), java.util.stream.IntStream.of(a.getStatus(), b.getStatus())
+                    .sorted().boxed().toList());
+            var firstId = objectMapper.readTree(a.getContentAsByteArray()).required("id").asText();
+            assertEquals(firstId, objectMapper.readTree(b.getContentAsByteArray()).required("id").asText());
+            assertEquals(1, jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM investment_transaction WHERE portfolio_id = ? AND request_id = ?",
+                    Integer.class, portfolioId, requestId));
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test
