@@ -13,7 +13,10 @@ import api_tech.api_investimentos.portfolio.application.PortfolioNotFoundExcepti
 import api_tech.api_investimentos.portfolio.application.PortfolioRepository;
 import api_tech.api_investimentos.portfolio.domain.Portfolio;
 import api_tech.api_investimentos.position.application.PositionService;
+import api_tech.api_investimentos.transaction.application.CreateTransactionCommand;
+import api_tech.api_investimentos.transaction.application.CreateTransactionResult;
 import api_tech.api_investimentos.transaction.application.TransactionRepository;
+import api_tech.api_investimentos.transaction.application.TransactionService;
 import api_tech.api_investimentos.transaction.domain.InvestmentTransaction;
 import api_tech.api_investimentos.transaction.domain.TransactionType;
 import jakarta.persistence.EntityManager;
@@ -42,12 +45,14 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Transactional
@@ -94,6 +99,9 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @Autowired
+    private TransactionService transactionService;
 
     @Autowired
     private PositionService positionService;
@@ -160,6 +168,58 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    void shouldPersistOnlyOneTransactionForConcurrentIdenticalRequestsOnMySql() throws Exception {
+        var fixtureTransaction = new TransactionTemplate(transactionManager);
+        fixtureTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        UUID portfolioId = UUID.randomUUID();
+        UUID assetId = UUID.randomUUID();
+        UUID ownerId = fixtureTransaction.execute(status -> {
+            UUID id = saveUser();
+            portfolioRepository.save(new Portfolio(portfolioId, id, "Concurrent replay portfolio"));
+            assetRepository.save(new Asset(assetId, AssetMarket.B3, "REPLAY3", AssetType.STOCK, "Replay asset"));
+            return id;
+        });
+        var command = new CreateTransactionCommand(UUID.randomUUID(), ownerId, portfolioId, assetId,
+                TransactionType.BUY, new BigDecimal("2"), new BigDecimal("20"), BigDecimal.ZERO, NOW);
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            Callable<CreateTransactionResult> submit = () -> {
+                ready.countDown();
+                if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Start timed out");
+                return transactionService.create(command);
+            };
+            var first = executor.submit(submit);
+            var second = executor.submit(submit);
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            var a = first.get(15, TimeUnit.SECONDS);
+            var b = second.get(15, TimeUnit.SECONDS);
+            assertTrue(a.created() ^ b.created(), "Exactly one request must create a transaction");
+            assertEquals(a.transaction().getId(), b.transaction().getId());
+            Long count = fixtureTransaction.execute(status -> entityManager.createQuery(
+                            "select count(t) from InvestmentTransaction t where t.portfolioId = :id", Long.class)
+                    .setParameter("id", portfolioId).getSingleResult());
+            assertEquals(1L, count.longValue());
+        } finally {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS));
+            inCommittedTransaction(() -> {
+                deleteFixture("delete from InvestmentTransaction t where t.portfolioId = :id", portfolioId);
+                deleteFixture("delete from Portfolio p where p.id = :id", portfolioId);
+                deleteFixture("delete from Asset a where a.id = :id", assetId);
+                deleteFixture("delete from User u where u.id = :id", ownerId);
+            });
+        }
+    }
+
+    private void deleteFixture(String query, UUID id) {
+        entityManager.createQuery(query).setParameter("id", id).executeUpdate();
     }
 
     @Test
