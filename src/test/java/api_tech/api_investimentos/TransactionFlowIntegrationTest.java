@@ -7,11 +7,14 @@ import api_tech.api_investimentos.transaction.api.CreateTransactionRequest;
 import api_tech.api_investimentos.transaction.domain.TransactionType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -19,12 +22,14 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -95,41 +100,69 @@ class TransactionFlowIntegrationTest {
         assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM investment_transaction WHERE portfolio_id = ?", Integer.class, portfolioId));
     }
 
-    @Test
-    void shouldPersistOnlyOneTransactionForConcurrentIdenticalRequests() throws Exception {
+    @ParameterizedTest(name = "Concurrent HTTP replay with different payload: {0}")
+    @ValueSource(booleans = {false, true})
+    void shouldPersistOnlyOneTransactionForConcurrentRequestsWithSameKey(boolean differentPayload) throws Exception {
         String owner = registerAndLogin("concurrent-replay");
         UUID portfolioId = createPortfolio(owner);
         UUID requestId = UUID.randomUUID();
-        var buy = request(requestId, portfolioId, createAsset(), TransactionType.BUY, "2",
-                Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.MICROS));
+        UUID assetId = createAsset();
+        Instant occurredAt = Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.MICROS);
+        var buy = request(requestId, portfolioId, assetId, TransactionType.BUY, "2", occurredAt);
+        var replay = differentPayload
+                ? request(requestId, portfolioId, assetId, TransactionType.BUY, "3", occurredAt)
+                : buy;
 
         var ready = new CountDownLatch(2);
         var start = new CountDownLatch(1);
         var executor = Executors.newFixedThreadPool(2);
         try {
-            java.util.concurrent.Callable<org.springframework.mock.web.MockHttpServletResponse> submit = () -> {
-                ready.countDown();
-                if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Start timed out");
-                return perform(owner, buy).andReturn().getResponse();
-            };
-            var first = executor.submit(submit);
-            var second = executor.submit(submit);
-            org.junit.jupiter.api.Assertions.assertTrue(ready.await(10, TimeUnit.SECONDS));
+            var first = executor.submit(submitTransaction(owner, buy, ready, start));
+            var second = executor.submit(submitTransaction(owner, replay, ready, start));
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
             start.countDown();
 
             var a = first.get(15, TimeUnit.SECONDS);
             var b = second.get(15, TimeUnit.SECONDS);
-            assertEquals(List.of(200, 201), java.util.stream.IntStream.of(a.getStatus(), b.getStatus())
-                    .sorted().boxed().toList());
-            var firstId = objectMapper.readTree(a.getContentAsByteArray()).required("id").asText();
-            assertEquals(firstId, objectMapper.readTree(b.getContentAsByteArray()).required("id").asText());
+            var created = a.getStatus() == 201 ? a : b;
+            var other = created == a ? b : a;
+            assertEquals(201, created.getStatus());
+            var createdId = objectMapper.readTree(created.getContentAsByteArray()).required("id").asText();
+            var otherBody = objectMapper.readTree(other.getContentAsByteArray());
+            if (differentPayload) {
+                assertEquals(409, other.getStatus());
+                assertTrue(MediaType.APPLICATION_PROBLEM_JSON.isCompatibleWith(
+                        MediaType.parseMediaType(other.getContentType())));
+                assertEquals(409, otherBody.required("status").intValue());
+                assertEquals("urn:problem-type:api-investimentos:resource-conflict",
+                        otherBody.required("type").asText());
+                assertEquals("Resource conflict", otherBody.required("title").asText());
+                assertEquals("The requestId was already used with different transaction data.",
+                        otherBody.required("detail").asText());
+            } else {
+                assertEquals(200, other.getStatus());
+                assertEquals(createdId, otherBody.required("id").asText());
+            }
             assertEquals(1, jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM investment_transaction WHERE portfolio_id = ? AND request_id = ?",
                     Integer.class, portfolioId, requestId));
+            var quantity = jdbcTemplate.queryForObject(
+                    "SELECT quantity FROM investment_transaction WHERE portfolio_id = ? AND request_id = ?",
+                    BigDecimal.class, portfolioId, requestId);
+            assertEquals(0, (created == a ? buy : replay).quantity().compareTo(quantity));
         } finally {
             start.countDown();
             executor.shutdownNow();
         }
+    }
+
+    private Callable<MockHttpServletResponse> submitTransaction(
+            String owner, CreateTransactionRequest request, CountDownLatch ready, CountDownLatch start) {
+        return () -> {
+            ready.countDown();
+            if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Start timed out");
+            return perform(owner, request).andReturn().getResponse();
+        };
     }
 
     @Test
