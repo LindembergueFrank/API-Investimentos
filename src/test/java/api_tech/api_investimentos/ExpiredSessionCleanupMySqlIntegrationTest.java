@@ -15,12 +15,15 @@ import api_tech.api_investimentos.portfolio.domain.Portfolio;
 import api_tech.api_investimentos.position.application.PositionService;
 import api_tech.api_investimentos.transaction.application.CreateTransactionCommand;
 import api_tech.api_investimentos.transaction.application.CreateTransactionResult;
+import api_tech.api_investimentos.transaction.application.IdempotencyConflictException;
 import api_tech.api_investimentos.transaction.application.TransactionRepository;
 import api_tech.api_investimentos.transaction.application.TransactionService;
 import api_tech.api_investimentos.transaction.domain.InvestmentTransaction;
 import api_tech.api_investimentos.transaction.domain.TransactionType;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -45,7 +48,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.math.BigDecimal;
 import java.util.UUID;
-import java.util.concurrent.Callable;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -170,8 +173,10 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
         }
     }
 
-    @Test
-    void shouldPersistOnlyOneTransactionForConcurrentIdenticalRequestsOnMySql() throws Exception {
+    @ParameterizedTest(name = "Concurrent replay with different payload: {0}")
+    @ValueSource(booleans = {false, true})
+    void shouldPersistOnlyOneTransactionForConcurrentRequestsWithSameKeyOnMySql(boolean differentPayload)
+            throws Exception {
         var fixtureTransaction = new TransactionTemplate(transactionManager);
         fixtureTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         UUID portfolioId = UUID.randomUUID();
@@ -184,28 +189,37 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
         });
         var command = new CreateTransactionCommand(UUID.randomUUID(), ownerId, portfolioId, assetId,
                 TransactionType.BUY, new BigDecimal("2"), new BigDecimal("20"), BigDecimal.ZERO, NOW);
+        var replay = differentPayload
+                ? new CreateTransactionCommand(command.requestId(), ownerId, portfolioId, assetId,
+                        TransactionType.BUY, new BigDecimal("3"), command.unitPrice(), command.fees(), NOW)
+                : command;
         var ready = new CountDownLatch(2);
         var start = new CountDownLatch(1);
         var executor = Executors.newFixedThreadPool(2);
         try {
-            Callable<CreateTransactionResult> submit = () -> {
-                ready.countDown();
-                if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Start timed out");
-                return transactionService.create(command);
-            };
-            var first = executor.submit(submit);
-            var second = executor.submit(submit);
+            var first = executor.submit(() -> submitTransaction(command, ready, start));
+            var second = executor.submit(() -> submitTransaction(replay, ready, start));
             assertTrue(ready.await(10, TimeUnit.SECONDS));
             start.countDown();
 
             var a = first.get(15, TimeUnit.SECONDS);
             var b = second.get(15, TimeUnit.SECONDS);
-            assertTrue(a.created() ^ b.created(), "Exactly one request must create a transaction");
-            assertEquals(a.transaction().getId(), b.transaction().getId());
-            Long count = fixtureTransaction.execute(status -> entityManager.createQuery(
-                            "select count(t) from InvestmentTransaction t where t.portfolioId = :id", Long.class)
-                    .setParameter("id", portfolioId).getSingleResult());
-            assertEquals(1L, count.longValue());
+            if (differentPayload) {
+                assertTrue(a.isEmpty() ^ b.isEmpty(), "Exactly one request must fail with an idempotency conflict");
+            } else {
+                assertEquals(a.orElseThrow().transaction().getId(), b.orElseThrow().transaction().getId());
+            }
+            boolean firstCreated = a.map(CreateTransactionResult::created).orElse(false);
+            assertTrue(firstCreated ^ b.map(CreateTransactionResult::created).orElse(false),
+                    "Exactly one request must create a transaction");
+            var winner = (firstCreated ? a : b).orElseThrow().transaction();
+            var expectedQuantity = (firstCreated ? command : replay).quantity();
+            var persisted = fixtureTransaction.execute(status -> entityManager.createQuery(
+                            "select t from InvestmentTransaction t where t.portfolioId = :id", InvestmentTransaction.class)
+                    .setParameter("id", portfolioId).getResultList());
+            assertEquals(1, persisted.size());
+            assertEquals(winner.getId(), persisted.getFirst().getId());
+            assertEquals(0, expectedQuantity.compareTo(persisted.getFirst().getQuantity()));
         } finally {
             executor.shutdownNow();
             assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS));
@@ -215,6 +229,17 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
                 deleteFixture("delete from Asset a where a.id = :id", assetId);
                 deleteFixture("delete from User u where u.id = :id", ownerId);
             });
+        }
+    }
+
+    private Optional<CreateTransactionResult> submitTransaction(
+            CreateTransactionCommand command, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Start timed out");
+        try {
+            return Optional.of(transactionService.create(command));
+        } catch (IdempotencyConflictException conflict) {
+            return Optional.empty();
         }
     }
 
