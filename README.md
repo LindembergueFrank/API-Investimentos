@@ -146,6 +146,8 @@ Para encerrar a sessão, use `POST /v1/auth/revoke` com o mesmo corpo. A respost
 
 Os três endpoints de autenticação compartilham, por endereço de origem, um limite padrão de 20 requisições por minuto. Ao excedê-lo, a API responde `429` em Problem Details, informa `Retry-After` e não processa a credencial. Ajuste `AUTH_RATE_LIMIT_MAX_REQUESTS` e `AUTH_RATE_LIMIT_WINDOW` conforme o ambiente. O limitador é local à instância; múltiplas réplicas exigirão armazenamento compartilhado em uma evolução posterior. A aplicação usa apenas o endereço remoto fornecido pelo servidor e não confia diretamente em headers encaminhados pelo cliente.
 
+Cada instância acompanha até 10 mil origens simultaneamente. No limite, novas origens recebem `429` se não houver espaço após a limpeza de janelas expiradas; origens já acompanhadas mantêm sua cota individual.
+
 A limpeza de sessões roda, por padrão, a cada hora e remove no máximo 500 famílias por execução. Uma família só é elegível quando todos os seus tokens expiraram há pelo menos sete dias; assim, um token ancestral não é apagado enquanto ainda pode existir um descendente válido cuja reutilização precise ser detectada. Configure esse comportamento com `AUTH_REFRESH_TOKEN_CLEANUP_ENABLED`, `AUTH_REFRESH_TOKEN_CLEANUP_INTERVAL`, `AUTH_REFRESH_TOKEN_CLEANUP_RETENTION` e `AUTH_REFRESH_TOKEN_CLEANUP_BATCH_SIZE`.
 
 ## Executando localmente
