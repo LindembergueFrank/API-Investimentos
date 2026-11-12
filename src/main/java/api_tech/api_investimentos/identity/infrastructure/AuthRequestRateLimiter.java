@@ -7,9 +7,8 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class AuthRequestRateLimiter {
@@ -18,8 +17,8 @@ public class AuthRequestRateLimiter {
 
     private final AuthRateLimitProperties properties;
     private final Clock clock;
-    private final ConcurrentHashMap<String, RequestWindow> windows = new ConcurrentHashMap<>();
-    private final AtomicLong nextCleanupEpochSecond = new AtomicLong();
+    private final Map<String, RequestWindow> windows = new HashMap<>();
+    private long nextCleanupEpochSecond = Long.MIN_VALUE;
 
     @Autowired
     public AuthRequestRateLimiter(AuthRateLimitProperties properties) {
@@ -31,40 +30,33 @@ public class AuthRequestRateLimiter {
         this.clock = clock;
     }
 
-    public Decision tryAcquire(String clientKey) {
+    public synchronized Decision tryAcquire(String clientKey) {
         Instant now = clock.instant();
+        var current = windows.get(clientKey);
 
-        if (!windows.containsKey(clientKey) && windows.size() >= MAX_TRACKED_CLIENTS) {
+        if (current == null && windows.size() >= MAX_TRACKED_CLIENTS) {
             removeExpiredWindows(now);
-            if (!windows.containsKey(clientKey) && windows.size() >= MAX_TRACKED_CLIENTS) {
+            if (windows.size() >= MAX_TRACKED_CLIENTS) {
                 return Decision.rejected(properties.window().toSeconds());
             }
         }
 
-        var decision = new AtomicReference<Decision>();
-        windows.compute(clientKey, (key, current) -> {
-            if (current == null || !now.isBefore(current.startedAt().plus(properties.window()))) {
-                decision.set(Decision.allowed());
-                return new RequestWindow(now, 1);
-            }
-
-            if (current.requestCount() >= properties.maxRequests()) {
-                decision.set(Decision.rejected(retryAfterSeconds(current, now)));
-                return current;
-            }
-
-            decision.set(Decision.allowed());
-            return new RequestWindow(current.startedAt(), current.requestCount() + 1);
-        });
-        return decision.get();
+        if (current == null || !now.isBefore(current.startedAt().plus(properties.window()))) {
+            windows.put(clientKey, new RequestWindow(now, 1));
+            return Decision.allowed();
+        }
+        if (current.requestCount() >= properties.maxRequests()) {
+            return Decision.rejected(retryAfterSeconds(current, now));
+        }
+        windows.put(clientKey, new RequestWindow(current.startedAt(), current.requestCount() + 1));
+        return Decision.allowed();
     }
 
     private void removeExpiredWindows(Instant now) {
-        long nextCleanup = nextCleanupEpochSecond.get();
-        if (now.getEpochSecond() < nextCleanup
-                || !nextCleanupEpochSecond.compareAndSet(nextCleanup, now.getEpochSecond() + 1)) {
+        if (now.getEpochSecond() < nextCleanupEpochSecond) {
             return;
         }
+        nextCleanupEpochSecond = now.getEpochSecond() + 1;
         windows.entrySet().removeIf(entry ->
                 !now.isBefore(entry.getValue().startedAt().plus(properties.window())));
     }
