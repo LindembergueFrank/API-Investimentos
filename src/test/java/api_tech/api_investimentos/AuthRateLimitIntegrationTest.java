@@ -120,6 +120,28 @@ class AuthRateLimitIntegrationTest {
     }
 
     @Test
+    void shouldShareOneClientQuotaBetweenApiAndBrowserSessionEndpoints() throws Exception {
+        String client = "198.51.100.50";
+        var request = new RefreshTokenRequest("unknown-refresh-token");
+
+        mockMvc.perform(from(client, "/v1/auth/refresh")
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(from(client, "/v1/auth/browser/refresh")
+                        .cookie(new Cookie("__Host-api-investimentos-refresh", "unknown-refresh-token")))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(from(client, "/v1/auth/browser/revoke"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(header().string("Retry-After", matchesPattern("[1-9][0-9]*")))
+                .andExpect(header().doesNotExist("Set-Cookie"))
+                .andExpect(jsonPath("$.type")
+                        .value("urn:problem-type:api-investimentos:rate-limit-exceeded"));
+    }
+
+    @Test
     void shouldApplyTheLimitWhenTheApplicationUsesAContextPath() throws Exception {
         String client = "198.51.100.30";
         var request = new LoginRequest("missing@example.com", "context-path-secret");
