@@ -1,6 +1,10 @@
 package api_tech.api_investimentos;
 
 import api_tech.api_investimentos.identity.application.ExpiredSessionCleanupService;
+import api_tech.api_investimentos.identity.application.AuthenticatedSession;
+import api_tech.api_investimentos.identity.application.AuthenticationService;
+import api_tech.api_investimentos.identity.application.InvalidRefreshTokenException;
+import api_tech.api_investimentos.identity.application.RefreshTokenCodec;
 import api_tech.api_investimentos.identity.application.RefreshTokenRepository;
 import api_tech.api_investimentos.identity.application.UserRepository;
 import api_tech.api_investimentos.identity.domain.RefreshToken;
@@ -112,6 +116,12 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private AuthenticationService authenticationService;
+
+    @Autowired
+    private RefreshTokenCodec refreshTokenCodec;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -170,6 +180,64 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
             assertEquals(0, cleanupService.cleanupBatch());
         } finally {
             executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void shouldRevokeTheDescendantAfterConcurrentRefreshTokenReuseOnMySql() throws Exception {
+        var fixtureTransaction = new TransactionTemplate(transactionManager);
+        fixtureTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        var original = refreshTokenCodec.generate();
+        UUID familyId = UUID.randomUUID();
+        UUID ownerId = fixtureTransaction.execute(status -> {
+            UUID id = saveUser();
+            Instant now = Instant.now();
+            refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), id, familyId,
+                    original.hash(), now.plusSeconds(3600), now, null));
+            return id;
+        });
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> refreshConcurrently(original.value(), ready, start));
+            var second = executor.submit(() -> refreshConcurrently(original.value(), ready, start));
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            var a = first.get(15, TimeUnit.SECONDS);
+            var b = second.get(15, TimeUnit.SECONDS);
+            assertTrue(a.isPresent() ^ b.isPresent(), "Exactly one refresh must succeed");
+            var winner = a.or(() -> b).orElseThrow();
+            fixtureTransaction.executeWithoutResult(status -> {
+                var tokens = refreshTokenRepository.findAllByFamilyId(familyId);
+                assertEquals(2, tokens.size(), "Only one descendant must be persisted");
+                assertTrue(tokens.stream().allMatch(RefreshToken::isRevoked),
+                        "Reuse must revoke both the original and its descendant");
+                assertTrue(tokens.stream().anyMatch(token ->
+                        token.getTokenHash().equals(refreshTokenCodec.hash(winner.refreshToken()))));
+            });
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> fixtureTransaction.execute(status ->
+                            authenticationService.refresh(winner.refreshToken())));
+        } finally {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS));
+            inCommittedTransaction(() -> {
+                deleteFixture("delete from RefreshToken t where t.familyId = :id", familyId);
+                deleteFixture("delete from User u where u.id = :id", ownerId);
+            });
+        }
+    }
+
+    private Optional<AuthenticatedSession> refreshConcurrently(
+            String token, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Start timed out");
+        try {
+            return Optional.of(authenticationService.refresh(token));
+        } catch (InvalidRefreshTokenException invalid) {
+            return Optional.empty();
         }
     }
 
