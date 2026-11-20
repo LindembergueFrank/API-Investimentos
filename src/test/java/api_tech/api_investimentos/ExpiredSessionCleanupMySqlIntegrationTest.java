@@ -15,6 +15,7 @@ import api_tech.api_investimentos.asset.domain.AssetMarket;
 import api_tech.api_investimentos.asset.domain.AssetType;
 import api_tech.api_investimentos.portfolio.application.PortfolioNotFoundException;
 import api_tech.api_investimentos.portfolio.application.PortfolioRepository;
+import api_tech.api_investimentos.portfolio.application.PortfolioService;
 import api_tech.api_investimentos.portfolio.domain.Portfolio;
 import api_tech.api_investimentos.position.application.PositionService;
 import api_tech.api_investimentos.transaction.application.CreateTransactionCommand;
@@ -100,6 +101,9 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
 
     @Autowired
     private PortfolioRepository portfolioRepository;
+
+    @Autowired
+    private PortfolioService portfolioService;
 
     @Autowired
     private AssetRepository assetRepository;
@@ -313,6 +317,35 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
 
     private void deleteFixture(String query, UUID id) {
         entityManager.createQuery(query).setParameter("id", id).executeUpdate();
+    }
+
+    @Test
+    void shouldEnforcePortfolioAndTransactionOwnershipOnMySql() {
+        UUID ownerId = saveUser();
+        UUID strangerId = saveUser();
+        UUID portfolioId = UUID.randomUUID();
+        UUID assetId = UUID.randomUUID();
+        portfolioRepository.save(new Portfolio(portfolioId, ownerId, "Owner portfolio"));
+        assetRepository.save(new Asset(assetId, AssetMarket.B3, "OWNER3", AssetType.STOCK, "Owner asset"));
+        entityManager.flush();
+
+        assertEquals(1L, portfolioService.listByOwner(ownerId, 0, 20).totalElements());
+        assertEquals(0L, portfolioService.listByOwner(strangerId, 0, 20).totalElements());
+        assertEquals(portfolioId, portfolioService.getById(portfolioId, ownerId).getId());
+        assertThrows(PortfolioNotFoundException.class,
+                () -> portfolioService.getById(portfolioId, strangerId));
+
+        var ownedCommand = new CreateTransactionCommand(UUID.randomUUID(), ownerId, portfolioId, assetId,
+                TransactionType.BUY, new BigDecimal("2"), new BigDecimal("20"), BigDecimal.ZERO, NOW);
+        assertTrue(transactionService.create(ownedCommand).created());
+        assertEquals(1L, transactionService.listByPortfolio(portfolioId, ownerId, 0, 20).totalElements());
+        assertThrows(PortfolioNotFoundException.class,
+                () -> transactionService.listByPortfolio(portfolioId, strangerId, 0, 20));
+
+        var foreignCommand = new CreateTransactionCommand(UUID.randomUUID(), strangerId, portfolioId, assetId,
+                TransactionType.BUY, BigDecimal.ONE, new BigDecimal("20"), BigDecimal.ZERO, NOW);
+        assertThrows(PortfolioNotFoundException.class, () -> transactionService.create(foreignCommand));
+        assertEquals(1, transactionRepository.findAllByPortfolioIdInLedgerOrder(portfolioId).size());
     }
 
     @Test
