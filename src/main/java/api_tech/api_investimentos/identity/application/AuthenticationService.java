@@ -2,11 +2,14 @@ package api_tech.api_investimentos.identity.application;
 
 import api_tech.api_investimentos.config.RefreshTokenProperties;
 import api_tech.api_investimentos.identity.domain.RefreshToken;
+import api_tech.api_investimentos.identity.domain.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -54,12 +57,19 @@ public class AuthenticationService {
 
     @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public AuthenticatedSession refresh(String refreshTokenValue) {
-        Instant now = Instant.now();
-        var storedToken = refreshTokenRepository.findByTokenHash(refreshTokenCodec.hash(refreshTokenValue))
+        String tokenHash = refreshTokenCodec.hash(refreshTokenValue);
+        var user = lockSessionOwner(tokenHash).orElseThrow(InvalidRefreshTokenException::new);
+        UUID familyId = refreshTokenRepository.findFamilyIdByTokenHash(tokenHash)
                 .orElseThrow(InvalidRefreshTokenException::new);
+        var familyTokens = refreshTokenRepository.findAllByFamilyIdForUpdate(familyId);
+        var storedToken = familyTokens.stream()
+                .filter(token -> token.getTokenHash().equals(tokenHash))
+                .findFirst()
+                .orElseThrow(InvalidRefreshTokenException::new);
+        Instant now = Instant.now();
 
         if (storedToken.isRevoked()) {
-            revokeFamily(storedToken.getFamilyId(), now);
+            revokeFamily(familyTokens, now);
             throw new InvalidRefreshTokenException();
         }
 
@@ -68,16 +78,31 @@ public class AuthenticationService {
             throw new InvalidRefreshTokenException();
         }
 
-        var user = userRepository.findById(storedToken.getUserId())
-                .orElseThrow(InvalidRefreshTokenException::new);
         storedToken.revoke(now);
-        return issueSession(user.getId(), storedToken.getFamilyId());
+        return issueSession(user.getId(), familyId);
     }
 
     @Transactional
     public void revoke(String refreshTokenValue) {
-        refreshTokenRepository.findByTokenHash(refreshTokenCodec.hash(refreshTokenValue))
-                .ifPresent(token -> revokeFamily(token.getFamilyId(), Instant.now()));
+        String tokenHash = refreshTokenCodec.hash(refreshTokenValue);
+        if (lockSessionOwner(tokenHash).isEmpty()) {
+            return;
+        }
+        var familyId = refreshTokenRepository.findFamilyIdByTokenHash(tokenHash);
+        if (familyId.isEmpty()) {
+            return;
+        }
+
+        var familyTokens = refreshTokenRepository.findAllByFamilyIdForUpdate(familyId.get());
+        if (familyTokens.stream().noneMatch(token -> token.getTokenHash().equals(tokenHash))) {
+            return;
+        }
+        revokeFamily(familyTokens, Instant.now());
+    }
+
+    private Optional<User> lockSessionOwner(String tokenHash) {
+        return refreshTokenRepository.findUserIdByTokenHash(tokenHash)
+                .flatMap(userRepository::findByIdForUpdate);
     }
 
     private AuthenticatedSession issueSession(UUID userId, UUID familyId) {
@@ -103,8 +128,7 @@ public class AuthenticationService {
         );
     }
 
-    private void revokeFamily(UUID familyId, Instant now) {
-        refreshTokenRepository.findAllByFamilyId(familyId)
-                .forEach(token -> token.revoke(now));
+    private void revokeFamily(List<RefreshToken> familyTokens, Instant now) {
+        familyTokens.forEach(token -> token.revoke(now));
     }
 }

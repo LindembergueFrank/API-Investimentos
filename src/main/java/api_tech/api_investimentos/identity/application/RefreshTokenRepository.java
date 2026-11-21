@@ -12,5 +12,11 @@ public interface RefreshTokenRepository {
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
+    Optional<UUID> findUserIdByTokenHash(String tokenHash);
+
+    Optional<UUID> findFamilyIdByTokenHash(String tokenHash);
+
     List<RefreshToken> findAllByFamilyId(UUID familyId);
+
+    List<RefreshToken> findAllByFamilyIdForUpdate(UUID familyId);
 }

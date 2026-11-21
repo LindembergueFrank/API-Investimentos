@@ -12,6 +12,8 @@ public interface UserRepository {
 
     Optional<User> findById(UUID id);
 
+    Optional<User> findByIdForUpdate(UUID id);
+
     Optional<User> findByEmail(String email);
 
     List<User> findAll();

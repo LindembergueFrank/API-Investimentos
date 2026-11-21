@@ -8,6 +8,7 @@ import api_tech.api_investimentos.identity.application.RefreshTokenCodec;
 import api_tech.api_investimentos.identity.application.RefreshTokenRepository;
 import api_tech.api_investimentos.identity.application.UserRepository;
 import api_tech.api_investimentos.identity.domain.RefreshToken;
+import api_tech.api_investimentos.identity.infrastructure.JpaRefreshTokenRepository;
 import api_tech.api_investimentos.identity.domain.User;
 import api_tech.api_investimentos.asset.application.AssetRepository;
 import api_tech.api_investimentos.asset.domain.Asset;
@@ -39,6 +40,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.data.repository.CrudRepository;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,10 +55,13 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -65,7 +70,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @Transactional
 @Testcontainers(disabledWithoutDocker = true)
-@Import(ExpiredSessionCleanupMySqlIntegrationTest.FixedClockConfig.class)
+@Import({ExpiredSessionCleanupMySqlIntegrationTest.FixedClockConfig.class,
+        ExpiredSessionCleanupMySqlIntegrationTest.CoordinatedRepositoryConfig.class})
 @TestPropertySource(properties = {
         "security.refresh-token.cleanup.enabled=false",
         "security.refresh-token.cleanup.retention=P7D",
@@ -125,6 +131,9 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
 
     @Autowired
     private RefreshTokenCodec refreshTokenCodec;
+
+    @Autowired
+    private FamilyReadGate familyReadGate;
 
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
@@ -231,6 +240,81 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
                 deleteFixture("delete from RefreshToken t where t.familyId = :id", familyId);
                 deleteFixture("delete from User u where u.id = :id", ownerId);
             });
+        }
+    }
+
+    @ParameterizedTest(name = "Revocation starts first: {0}")
+    @ValueSource(booleans = {true, false})
+    void shouldSerializeRefreshAgainstRevocationInBothOrderingsOnMySql(boolean revokeFirst) throws Exception {
+        var fixtureTransaction = new TransactionTemplate(transactionManager);
+        fixtureTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        var ancestor = refreshTokenCodec.generate();
+        var descendant = refreshTokenCodec.generate();
+        UUID familyId = UUID.randomUUID();
+        UUID ownerId = fixtureTransaction.execute(status -> {
+            UUID id = saveUser();
+            Instant now = Instant.now();
+            refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), id, familyId,
+                    ancestor.hash(), now.plusSeconds(3600), now, null));
+            refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), id, familyId,
+                    descendant.hash(), now.plusSeconds(3600), now, null));
+            return id;
+        });
+
+        familyReadGate.arm(familyId, revokeFirst ? descendant.hash() : ancestor.hash());
+        var executor = Executors.newFixedThreadPool(2);
+        Future<?> revocation;
+        Future<Optional<AuthenticatedSession>> refresh;
+        try {
+            if (revokeFirst) {
+                revocation = executor.submit(() -> authenticationService.revoke(ancestor.value()));
+                assertTrue(familyReadGate.awaitFamilyRead(10, TimeUnit.SECONDS),
+                        "Revocation must pause after locking the family");
+                refresh = executor.submit(() -> refreshIfAccepted(descendant.value()));
+            } else {
+                refresh = executor.submit(() -> refreshIfAccepted(descendant.value()));
+                assertTrue(familyReadGate.awaitFamilyRead(10, TimeUnit.SECONDS),
+                        "Refresh must pause after locking the family");
+                revocation = executor.submit(() -> authenticationService.revoke(ancestor.value()));
+            }
+
+            assertTrue(familyReadGate.awaitTokenLookup(10, TimeUnit.SECONDS),
+                    "The competing operation must resolve its distinct token while the first holds the family lock");
+            familyReadGate.releaseFamilyRead();
+
+            var issued = refresh.get(15, TimeUnit.SECONDS);
+            assertEquals(!revokeFirst, issued.isPresent(),
+                    "Only a refresh that obtains the family lock before revocation may issue a descendant");
+            revocation.get(15, TimeUnit.SECONDS);
+
+            var persisted = fixtureTransaction.execute(
+                    status -> refreshTokenRepository.findAllByFamilyId(familyId));
+            assertEquals(revokeFirst ? 2 : 3, persisted.size(),
+                    "No descendant may be issued after revocation wins the family lock");
+            assertTrue(persisted.stream().allMatch(RefreshToken::isRevoked),
+                    "Every persisted token in the family must be revoked");
+            assertThrows(InvalidRefreshTokenException.class, () -> fixtureTransaction.execute(
+                    status -> authenticationService.refresh(ancestor.value())));
+            assertThrows(InvalidRefreshTokenException.class, () -> fixtureTransaction.execute(
+                    status -> authenticationService.refresh(descendant.value())));
+            issued.ifPresent(session -> assertThrows(InvalidRefreshTokenException.class, () ->
+                    fixtureTransaction.execute(status -> authenticationService.refresh(session.refreshToken()))));
+        } finally {
+            familyReadGate.releaseFamilyRead();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS));
+            inCommittedTransaction(() -> {
+                deleteFixture("delete from RefreshToken t where t.familyId = :id", familyId);
+                deleteFixture("delete from User u where u.id = :id", ownerId);
+            });
+        }
+    }
+
+    private Optional<AuthenticatedSession> refreshIfAccepted(String token) {
+        try {
+            return Optional.of(authenticationService.refresh(token));
+        } catch (InvalidRefreshTokenException invalid) {
+            return Optional.empty();
         }
     }
 
@@ -456,6 +540,115 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
         var transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         transaction.executeWithoutResult(status -> work.run());
+    }
+
+    static final class FamilyReadGate {
+        private volatile UUID targetFamilyId;
+        private volatile String targetTokenHash;
+        private volatile CountDownLatch familyReadEntered = new CountDownLatch(0);
+        private volatile CountDownLatch allowFamilyRead = new CountDownLatch(0);
+        private volatile CountDownLatch tokenLookupCompleted = new CountDownLatch(0);
+        private final AtomicBoolean armed = new AtomicBoolean();
+
+        void arm(UUID familyId, String tokenHash) {
+            targetFamilyId = familyId;
+            targetTokenHash = tokenHash;
+            familyReadEntered = new CountDownLatch(1);
+            allowFamilyRead = new CountDownLatch(1);
+            tokenLookupCompleted = new CountDownLatch(1);
+            armed.set(true);
+        }
+
+        void afterFamilyRead(UUID familyId) {
+            if (!familyId.equals(targetFamilyId) || !armed.compareAndSet(true, false)) {
+                return;
+            }
+            familyReadEntered.countDown();
+            try {
+                if (!allowFamilyRead.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Timed out waiting to release the family read gate");
+                }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while holding the family read gate", exception);
+            }
+        }
+
+        void afterTokenLookup(String tokenHash) {
+            if (tokenHash.equals(targetTokenHash)) {
+                tokenLookupCompleted.countDown();
+            }
+        }
+
+        boolean awaitFamilyRead(long timeout, TimeUnit unit) throws InterruptedException {
+            return familyReadEntered.await(timeout, unit);
+        }
+
+        boolean awaitTokenLookup(long timeout, TimeUnit unit) throws InterruptedException {
+            return tokenLookupCompleted.await(timeout, unit);
+        }
+
+        void releaseFamilyRead() {
+            allowFamilyRead.countDown();
+        }
+    }
+
+    @TestConfiguration
+    static class CoordinatedRepositoryConfig {
+
+        @Bean
+        FamilyReadGate familyReadGate() {
+            return new FamilyReadGate();
+        }
+
+        @Bean
+        @Primary
+        RefreshTokenRepository coordinatedRefreshTokenRepository(
+                JpaRefreshTokenRepository delegate,
+                FamilyReadGate gate
+        ) {
+            return new RefreshTokenRepository() {
+                @Override
+                public <S extends RefreshToken> S save(S refreshToken) {
+                    return ((CrudRepository<RefreshToken, UUID>) delegate).save(refreshToken);
+                }
+
+                @Override
+                public Optional<RefreshToken> findByTokenHash(String tokenHash) {
+                    var token = delegate.findByTokenHash(tokenHash);
+                    gate.afterTokenLookup(tokenHash);
+                    return token;
+                }
+
+                @Override
+                public Optional<UUID> findUserIdByTokenHash(String tokenHash) {
+                    var userId = delegate.findUserIdByTokenHash(tokenHash);
+                    gate.afterTokenLookup(tokenHash);
+                    return userId;
+                }
+
+                @Override
+                public Optional<UUID> findFamilyIdByTokenHash(String tokenHash) {
+                    var familyId = delegate.findFamilyIdByTokenHash(tokenHash);
+                    gate.afterTokenLookup(tokenHash);
+                    return familyId;
+                }
+
+                @Override
+                public List<RefreshToken> findAllByFamilyId(UUID familyId) {
+                    var tokens = delegate.findAllByFamilyId(familyId);
+                    gate.afterFamilyRead(familyId);
+                    return tokens;
+                }
+
+                @Override
+                public List<RefreshToken> findAllByFamilyIdForUpdate(UUID familyId) {
+                    var tokens = delegate.findAllByFamilyIdForUpdate(familyId);
+                    gate.afterFamilyRead(familyId);
+                    return tokens;
+                }
+            };
+        }
     }
 
     @TestConfiguration
