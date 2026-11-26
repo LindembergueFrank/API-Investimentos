@@ -243,6 +243,73 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
         }
     }
 
+
+    @Test
+    void shouldAllowRefreshForDifferentUserWhileAnotherOwnerIsLockedOnMySql() throws Exception {
+        var fixtureTransaction = new TransactionTemplate(transactionManager);
+        fixtureTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        var firstToken = refreshTokenCodec.generate();
+        var secondToken = refreshTokenCodec.generate();
+        UUID firstFamilyId = UUID.randomUUID();
+        UUID secondFamilyId = UUID.randomUUID();
+        UUID[] ownerIds = fixtureTransaction.execute(status -> {
+            UUID firstOwnerId = saveUser();
+            UUID secondOwnerId = saveUser();
+            Instant now = Instant.now();
+            refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), firstOwnerId, firstFamilyId,
+                    firstToken.hash(), now.plusSeconds(3600), now, null));
+            refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), secondOwnerId, secondFamilyId,
+                    secondToken.hash(), now.plusSeconds(3600), now, null));
+            return new UUID[]{firstOwnerId, secondOwnerId};
+        });
+
+        familyReadGate.arm(firstFamilyId, secondToken.hash());
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<AuthenticatedSession> firstRefresh =
+                    executor.submit(() -> authenticationService.refresh(firstToken.value()));
+            assertTrue(familyReadGate.awaitFamilyRead(10, TimeUnit.SECONDS),
+                    "The first refresh must hold its owner's lock while paused after the family read");
+
+            Future<AuthenticatedSession> secondRefresh =
+                    executor.submit(() -> authenticationService.refresh(secondToken.value()));
+            assertTrue(familyReadGate.awaitTokenLookup(10, TimeUnit.SECONDS),
+                    "The second user's token lookup must complete while the first owner remains locked");
+
+            AuthenticatedSession secondSession = secondRefresh.get(10, TimeUnit.SECONDS);
+            assertTrue(!firstRefresh.isDone(),
+                    "The first refresh must remain paused while the independent owner completes");
+
+            familyReadGate.releaseFamilyRead();
+            AuthenticatedSession firstSession = firstRefresh.get(15, TimeUnit.SECONDS);
+
+            var firstFamily = fixtureTransaction.execute(
+                    status -> refreshTokenRepository.findAllByFamilyId(firstFamilyId));
+            var secondFamily = fixtureTransaction.execute(
+                    status -> refreshTokenRepository.findAllByFamilyId(secondFamilyId));
+            assertEquals(2, firstFamily.size());
+            assertEquals(2, secondFamily.size());
+            assertEquals(1L, firstFamily.stream().filter(RefreshToken::isRevoked).count());
+            assertEquals(1L, secondFamily.stream().filter(RefreshToken::isRevoked).count());
+            assertTrue(firstFamily.stream().anyMatch(token ->
+                    token.getTokenHash().equals(refreshTokenCodec.hash(firstSession.refreshToken()))
+                            && token.getUserId().equals(ownerIds[0]) && !token.isRevoked()));
+            assertTrue(secondFamily.stream().anyMatch(token ->
+                    token.getTokenHash().equals(refreshTokenCodec.hash(secondSession.refreshToken()))
+                            && token.getUserId().equals(ownerIds[1]) && !token.isRevoked()));
+        } finally {
+            familyReadGate.releaseFamilyRead();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS));
+            inCommittedTransaction(() -> {
+                deleteFixture("delete from RefreshToken t where t.familyId = :id", firstFamilyId);
+                deleteFixture("delete from RefreshToken t where t.familyId = :id", secondFamilyId);
+                deleteFixture("delete from User u where u.id = :id", ownerIds[0]);
+                deleteFixture("delete from User u where u.id = :id", ownerIds[1]);
+            });
+        }
+    }
+
     @ParameterizedTest(name = "Revocation starts first: {0}")
     @ValueSource(booleans = {true, false})
     void shouldSerializeRefreshAgainstRevocationInBothOrderingsOnMySql(boolean revokeFirst) throws Exception {
