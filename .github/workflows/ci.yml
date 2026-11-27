@@ -32,6 +32,9 @@ jobs:
       - name: Measure position read path
         run: ./mvnw -B -Dtest=PositionReadPathBenchmark test
 
+      - name: Measure refresh lock contention on MySQL 8.4
+        run: ./mvnw -B -Dtest=RefreshLockContentionBenchmark test
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
