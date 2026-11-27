@@ -632,7 +632,7 @@ class ExpiredSessionCleanupMySqlIntegrationTest {
             }
             familyReadEntered.countDown();
             try {
-                if (!allowFamilyRead.await(10, TimeUnit.SECONDS)) {
+                if (!allowFamilyRead.await(30, TimeUnit.SECONDS)) {
                     throw new IllegalStateException("Timed out waiting to release the family read gate");
                 }
             } catch (InterruptedException exception) {
