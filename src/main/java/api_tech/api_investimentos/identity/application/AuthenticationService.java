@@ -5,6 +5,7 @@ import api_tech.api_investimentos.identity.domain.RefreshToken;
 import api_tech.api_investimentos.identity.domain.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -55,7 +56,7 @@ public class AuthenticationService {
         return issueSession(authenticatedUser.getId(), UUID.randomUUID());
     }
 
-    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
+    @Transactional(isolation = Isolation.READ_COMMITTED, noRollbackFor = InvalidRefreshTokenException.class)
     public AuthenticatedSession refresh(String refreshTokenValue) {
         String tokenHash = refreshTokenCodec.hash(refreshTokenValue);
         var user = lockSessionOwner(tokenHash).orElseThrow(InvalidRefreshTokenException::new);
@@ -82,7 +83,7 @@ public class AuthenticationService {
         return issueSession(user.getId(), familyId);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void revoke(String refreshTokenValue) {
         String tokenHash = refreshTokenCodec.hash(refreshTokenValue);
         if (lockSessionOwner(tokenHash).isEmpty()) {
